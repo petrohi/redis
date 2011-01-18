@@ -776,19 +776,24 @@ void zrangeGenericCommand(redisClient *c, robj *dstkey, int reverse) {
     zskiplist *zsl;
     zskiplistNode *ln;
     robj *ele;
-    int argvoff = (dstkey != NULL) ? 1 : 0;
+    int argoff = (dstkey != NULL) ? 1 : 0;
 
-    if ((getLongFromObjectOrReply(c, c->argv[argvoff + 2], &start, NULL) != REDIS_OK) ||
-        (getLongFromObjectOrReply(c, c->argv[argvoff + 3], &end, NULL) != REDIS_OK)) return;
+    if ((getLongFromObjectOrReply(c, c->argv[argoff + 2], &start, NULL) != REDIS_OK) ||
+        (getLongFromObjectOrReply(c, c->argv[argoff + 3], &end, NULL) != REDIS_OK)) return;
 
-    if (c->argc == (argvoff + 5) && !strcasecmp(c->argv[argvoff + 4]->ptr,"withscores")) {
-        withscores = 1;
-    } else if (c->argc >= (argvoff + 5)) {
+    if (dstkey == NULL) {
+        if (c->argc == 5 && !strcasecmp(c->argv[4]->ptr,"withscores")) {
+            withscores = 1;
+        } else if (c->argc >= 5) {
+            addReply(c,shared.syntaxerr);
+            return;
+        }
+    } else if (c->argc > 5) {
         addReply(c,shared.syntaxerr);
         return;
     }
 
-    if ((o = lookupKeyReadOrReply(c,c->argv[argvoff + 1],shared.emptymultibulk)) == NULL
+    if ((o = lookupKeyReadOrReply(c,c->argv[argoff + 1],shared.emptymultibulk)) == NULL
          || checkType(c,o,REDIS_ZSET)) return;
     zsetobj = o->ptr;
     zsl = zsetobj->zsl;
