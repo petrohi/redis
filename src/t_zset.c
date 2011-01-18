@@ -765,7 +765,7 @@ void zinterstoreCommand(redisClient *c) {
     zunionInterGenericCommand(c,c->argv[1], REDIS_OP_INTER);
 }
 
-void zrangeGenericCommand(redisClient *c, int reverse) {
+void zrangeGenericCommand(redisClient *c, robj *dstkey, int reverse) {
     robj *o;
     long start;
     long end;
@@ -776,18 +776,19 @@ void zrangeGenericCommand(redisClient *c, int reverse) {
     zskiplist *zsl;
     zskiplistNode *ln;
     robj *ele;
+    int argvoff = (dstkey != NULL) ? 1 : 0;
 
-    if ((getLongFromObjectOrReply(c, c->argv[2], &start, NULL) != REDIS_OK) ||
-        (getLongFromObjectOrReply(c, c->argv[3], &end, NULL) != REDIS_OK)) return;
+    if ((getLongFromObjectOrReply(c, c->argv[argvoff + 2], &start, NULL) != REDIS_OK) ||
+        (getLongFromObjectOrReply(c, c->argv[argvoff + 3], &end, NULL) != REDIS_OK)) return;
 
-    if (c->argc == 5 && !strcasecmp(c->argv[4]->ptr,"withscores")) {
+    if (c->argc == (argvoff + 5) && !strcasecmp(c->argv[argvoff + 4]->ptr,"withscores")) {
         withscores = 1;
-    } else if (c->argc >= 5) {
+    } else if (c->argc >= (argvoff + 5)) {
         addReply(c,shared.syntaxerr);
         return;
     }
 
-    if ((o = lookupKeyReadOrReply(c,c->argv[1],shared.emptymultibulk)) == NULL
+    if ((o = lookupKeyReadOrReply(c,c->argv[argvoff + 1],shared.emptymultibulk)) == NULL
          || checkType(c,o,REDIS_ZSET)) return;
     zsetobj = o->ptr;
     zsl = zsetobj->zsl;
@@ -816,23 +817,48 @@ void zrangeGenericCommand(redisClient *c, int reverse) {
             zsl->header->level[0].forward : zslistTypeGetElementByRank(zsl, start+1);
     }
 
-    /* Return the result in form of a multi-bulk reply */
-    addReplyMultiBulkLen(c,withscores ? (rangelen*2) : rangelen);
-    for (j = 0; j < rangelen; j++) {
-        ele = ln->obj;
-        addReplyBulk(c,ele);
-        if (withscores)
-            addReplyDouble(c,ln->score);
-        ln = reverse ? ln->backward : ln->level[0].forward;
+    if (dstkey == NULL)
+    {
+        /* Return the result in form of a multi-bulk reply */
+        addReplyMultiBulkLen(c,withscores ? (rangelen*2) : rangelen);
+        for (j = 0; j < rangelen; j++) {
+            ele = ln->obj;
+            addReplyBulk(c,ele);
+            if (withscores)
+                addReplyDouble(c,ln->score);
+            ln = reverse ? ln->backward : ln->level[0].forward;
+        }
+    } else {
+        robj *sobj = createZiplistObject();
+        for (j = 0; j < rangelen; j++) {
+            listTypePush(sobj,ln->obj,REDIS_TAIL);
+            ln = reverse ? ln->backward : ln->level[0].forward;
+        }
+        dbReplace(c->db,dstkey,sobj);
+        /* Note: we add 1 because the DB is dirty anyway since even if the
+         * SORT result is empty a new key is set and maybe the old content
+         * replaced. */
+        server.dirty += 1+rangelen;
+        signalModifiedKey(c->db,dstkey);
+        addReplyLongLong(c,rangelen);
+
     }
 }
 
 void zrangeCommand(redisClient *c) {
-    zrangeGenericCommand(c,0);
+    zrangeGenericCommand(c,NULL,0);
 }
 
 void zrevrangeCommand(redisClient *c) {
-    zrangeGenericCommand(c,1);
+    zrangeGenericCommand(c,NULL,1);
+}
+
+void zrangestoreCommand(redisClient *c) {
+    zrangeGenericCommand(c,c->argv[1],0);
+}
+
+void zrevrangestoreCommand(redisClient *c) {
+    zrangeGenericCommand(c,c->argv[1],1);
 }
 
 /* This command implements ZRANGEBYSCORE, ZREVRANGEBYSCORE and ZCOUNT.
