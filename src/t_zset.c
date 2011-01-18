@@ -788,9 +788,6 @@ void zrangeGenericCommand(redisClient *c, robj *dstkey, int reverse) {
             addReply(c,shared.syntaxerr);
             return;
         }
-    } else if (c->argc > 5) {
-        addReply(c,shared.syntaxerr);
-        return;
     }
 
     if ((o = lookupKeyReadOrReply(c,c->argv[argoff + 1],shared.emptymultibulk)) == NULL
