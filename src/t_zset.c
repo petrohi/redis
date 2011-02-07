@@ -837,13 +837,9 @@ void zrangeGenericCommand(redisClient *c, robj *dstkey, int reverse) {
             ln = reverse ? ln->backward : ln->level[0].forward;
         }
         dbReplace(c->db,dstkey,sobj);
-        /* Note: we add 1 because the DB is dirty anyway since even if the
-         * SORT result is empty a new key is set and maybe the old content
-         * replaced. */
         server.dirty += 1+rangelen;
         signalModifiedKey(c->db,dstkey);
         addReplyLongLong(c,rangelen);
-
     }
 }
 
@@ -865,9 +861,9 @@ void zrevrangestoreCommand(redisClient *c) {
 
 /* This command implements ZRANGEBYSCORE, ZREVRANGEBYSCORE and ZCOUNT.
  * If "justcount", only the number of elements in the range is returned. */
-void genericZrangebyscoreCommand(redisClient *c, int reverse, int justcount) {
+void genericZrangebyscoreCommand(redisClient *c, robj *dstkey, int reverse, int justcount) {
     zrangespec range;
-    robj *o, *emptyreply;
+    robj *o, *emptyreply, *sobj = NULL;
     zset *zsetobj;
     zskiplist *zsl;
     zskiplistNode *ln;
@@ -875,21 +871,22 @@ void genericZrangebyscoreCommand(redisClient *c, int reverse, int justcount) {
     int withscores = 0;
     unsigned long rangelen = 0;
     void *replylen = NULL;
+    int argoff = (dstkey != NULL) ? 1 : 0;
 
     /* Parse the range arguments. */
-    if (zslParseRange(c->argv[2],c->argv[3],&range) != REDIS_OK) {
+    if (zslParseRange(c->argv[argoff + 2],c->argv[argoff + 3],&range) != REDIS_OK) {
         addReplyError(c,"min or max is not a double");
         return;
     }
 
     /* Parse optional extra arguments. Note that ZCOUNT will exactly have
      * 4 arguments, so we'll never enter the following code path. */
-    if (c->argc > 4) {
-        int remaining = c->argc - 4;
-        int pos = 4;
+    if (c->argc > (4 + argoff)) {
+        int pos = 4 + argoff;
+        int remaining = c->argc - pos;
 
         while (remaining) {
-            if (remaining >= 1 && !strcasecmp(c->argv[pos]->ptr,"withscores")) {
+            if (dstkey == NULL && remaining >= 1 && !strcasecmp(c->argv[pos]->ptr,"withscores")) {
                 pos++; remaining--;
                 withscores = 1;
             } else if (remaining >= 3 && !strcasecmp(c->argv[pos]->ptr,"limit")) {
@@ -905,7 +902,7 @@ void genericZrangebyscoreCommand(redisClient *c, int reverse, int justcount) {
 
     /* Ok, lookup the key and get the range */
     emptyreply = justcount ? shared.czero : shared.emptymultibulk;
-    if ((o = lookupKeyReadOrReply(c,c->argv[1],emptyreply)) == NULL ||
+    if ((o = lookupKeyReadOrReply(c,c->argv[argoff + 1],emptyreply)) == NULL ||
         checkType(c,o,REDIS_ZSET)) return;
     zsetobj = o->ptr;
     zsl = zsetobj->zsl;
@@ -945,11 +942,13 @@ void genericZrangebyscoreCommand(redisClient *c, int reverse, int justcount) {
         return;
     }
 
+    if (dstkey != NULL)
+        sobj = createZiplistObject();
     /* We don't know in advance how many matching elements there
      * are in the list, so we push this object that will represent
      * the multi-bulk length in the output buffer, and will "fix"
      * it later */
-    if (!justcount)
+    else if (!justcount)
         replylen = addDeferredMultiBulkLength(c);
 
     /* If there is an offset, just traverse the number of elements without
@@ -960,7 +959,7 @@ void genericZrangebyscoreCommand(redisClient *c, int reverse, int justcount) {
         else
             ln = ln->level[0].forward;
     }
-
+    
     while (ln && limit--) {
         /* Check if this this element is in range. */
         if (reverse) {
@@ -983,11 +982,17 @@ void genericZrangebyscoreCommand(redisClient *c, int reverse, int justcount) {
 
         /* Do our magic */
         rangelen++;
-        if (!justcount) {
-            addReplyBulk(c,ln->obj);
-            if (withscores)
-                addReplyDouble(c,ln->score);
+
+        if (dstkey == NULL) { 
+            if (!justcount) {
+                addReplyBulk(c,ln->obj);
+                if (withscores)
+                    addReplyDouble(c,ln->score);
+            }
+        } else {
+            listTypePush(sobj,ln->obj,REDIS_TAIL);
         }
+
 
         if (reverse)
             ln = ln->backward;
@@ -995,24 +1000,39 @@ void genericZrangebyscoreCommand(redisClient *c, int reverse, int justcount) {
             ln = ln->level[0].forward;
     }
 
-    if (justcount) {
-        addReplyLongLong(c,(long)rangelen);
+    if (dstkey == NULL) {
+        if (justcount) {
+            addReplyLongLong(c,(long)rangelen);
+        } else {
+            setDeferredMultiBulkLength(c,replylen,
+                withscores ? (rangelen*2) : rangelen);
+        }
     } else {
-        setDeferredMultiBulkLength(c,replylen,
-             withscores ? (rangelen*2) : rangelen);
+        dbReplace(c->db,dstkey,sobj);
+        server.dirty += 1+rangelen;
+        signalModifiedKey(c->db,dstkey);
+        addReplyLongLong(c,rangelen);
     }
 }
 
 void zrangebyscoreCommand(redisClient *c) {
-    genericZrangebyscoreCommand(c,0,0);
+    genericZrangebyscoreCommand(c,NULL,0,0);
 }
 
 void zrevrangebyscoreCommand(redisClient *c) {
-    genericZrangebyscoreCommand(c,1,0);
+    genericZrangebyscoreCommand(c,NULL,1,0);
+}
+
+void zrangebyscorestoreCommand(redisClient *c) {
+    genericZrangebyscoreCommand(c,c->argv[1],0,0);
+}
+
+void zrevrangebyscorestoreCommand(redisClient *c) {
+    genericZrangebyscoreCommand(c,c->argv[1],1,0);
 }
 
 void zcountCommand(redisClient *c) {
-    genericZrangebyscoreCommand(c,0,1);
+    genericZrangebyscoreCommand(c,NULL,0,1);
 }
 
 void zcardCommand(redisClient *c) {
