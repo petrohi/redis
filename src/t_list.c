@@ -958,3 +958,59 @@ void brpoplpushCommand(redisClient *c) {
         }
     }
 }
+
+/*
+ *  ltosetstore destination key
+ */
+void ltosetstoreCommand(redisClient *c) {
+    robj *src, *dstset = NULL, *tmp = NULL;
+    
+    /* find the source list */
+    if ((src=lookupKeyReadOrReply(c,c->argv[2],shared.emptymultibulk)) == NULL
+         || checkType(c,src,REDIS_LIST)) return;
+
+    dstset = createIntsetObject();
+
+    if (src->encoding == REDIS_ENCODING_LINKEDLIST) {
+	listIter* it;
+        listNode* node;
+        it = listGetIterator(src->ptr, AL_START_HEAD);
+	while ((node=listNext(it))!=NULL) {
+	    setTypeAdd(dstset, node->value);
+        }
+        listReleaseIterator(it);
+    }
+    else if (src->encoding == REDIS_ENCODING_ZIPLIST) {
+        unsigned char *p = ziplistIndex(src->ptr, ZIPLIST_HEAD);
+        unsigned char *vstr;
+        unsigned int   vlen;
+        long long vlong;
+        while (p) {
+            ziplistGet(p,&vstr,&vlen,&vlong);
+            if (vstr) {
+		tmp=createStringObject(vstr,vlen);
+            } else {
+                tmp=createStringObjectFromLongLong(vlong);
+            }
+	    setTypeAdd(dstset, tmp);
+	    decrRefCount(tmp); 	    /* release tmp */
+            p = ziplistNext(src->ptr, p);
+        }
+    }
+    else {
+	redisPanic("List encoding is not LINKEDLIST nor ZIPLIST!");
+    }
+
+    dbDelete(c->db,c->argv[1]);
+
+    if (setTypeSize(dstset) > 0) {
+	dbAdd(c->db,c->argv[1],dstset);
+	addReplyLongLong(c,setTypeSize(dstset));
+    } else {
+	decrRefCount(dstset);
+	addReply(c,shared.czero);
+    }
+
+    signalModifiedKey(c->db,c->argv[1]);
+    server.dirty++;
+}
