@@ -988,7 +988,7 @@ void ltosetstoreCommand(redisClient *c) {
         while (p) {
             ziplistGet(p,&vstr,&vlen,&vlong);
             if (vstr) {
-		tmp=createStringObject(vstr,vlen);
+		tmp=createStringObject((char*)vstr,vlen);
             } else {
                 tmp=createStringObjectFromLongLong(vlong);
             }
