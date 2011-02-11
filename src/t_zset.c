@@ -286,6 +286,22 @@ unsigned long zslistTypeGetRank(zskiplist *zsl, double score, robj *o) {
     return 0;
 }
 
+/* score = 0, find the value or next close */
+unsigned long zslistTypeGetRankNext(zskiplist *zsl, robj *o) {
+    zskiplistNode *x;
+    unsigned long rank = 0;
+    int i;
+
+    x = zsl->header;
+    for (i = zsl->level-1; i >= 0; i--) {
+        while (x->level[i].forward && compareStringObjects(x->level[i].forward->obj,o) <= 0) {
+            rank += x->level[i].span;
+            x = x->level[i].forward;
+        }
+    }
+    return rank;
+}
+
 /* Finds an element by its rank. The rank argument needs to be 1-based. */
 zskiplistNode* zslistTypeGetElementByRank(zskiplist *zsl, unsigned long rank) {
     zskiplistNode *x;
@@ -1066,7 +1082,7 @@ void zscoreCommand(redisClient *c) {
     }
 }
 
-void zrankGenericCommand(redisClient *c, int reverse) {
+void zrankGenericCommand(redisClient *c, int reverse, int exact) {
     robj *o;
     zset *zs;
     zskiplist *zsl;
@@ -1081,28 +1097,49 @@ void zrankGenericCommand(redisClient *c, int reverse) {
     zsl = zs->zsl;
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     de = dictFind(zs->dict,c->argv[2]);
-    if (!de) {
-        addReply(c,shared.nullbulk);
-        return;
-    }
 
-    score = dictGetEntryVal(de);
-    rank = zslistTypeGetRank(zsl, *score, c->argv[2]);
-    if (rank) {
-        if (reverse) {
-            addReplyLongLong(c, zsl->length - rank);
-        } else {
-            addReplyLongLong(c, rank-1);
-        }
-    } else {
-        addReply(c,shared.nullbulk);
+    if (!de) {
+	if (exact) {
+	    addReply(c,shared.nullbulk);
+	    return;
+	}
+	rank = zslistTypeGetRankNext(zsl, c->argv[2]);
+
+	if (reverse) {
+	    addReplyLongLong(c, zsl->length - rank);
+	} else {
+	    addReplyLongLong(c, rank);
+	}
+    }
+    else {
+	score = dictGetEntryVal(de);
+	rank = zslistTypeGetRank(zsl, *score, c->argv[2]);
+  
+	if (rank) {
+	    if (reverse) {
+		addReplyLongLong(c, zsl->length - rank);
+	    } else {
+		addReplyLongLong(c, rank-1);
+	    }
+	} else {
+	    addReply(c,shared.nullbulk);
+	}
     }
 }
 
 void zrankCommand(redisClient *c) {
-    zrankGenericCommand(c, 0);
+    zrankGenericCommand(c, 0, 1);
 }
 
 void zrevrankCommand(redisClient *c) {
-    zrankGenericCommand(c, 1);
+    zrankGenericCommand(c, 1, 1);
 }
+
+void zrankornextCommand(redisClient *c) {
+    zrankGenericCommand(c, 0, 0);
+}
+
+void zrevrankornextCommand(redisClient *c) {
+    zrankGenericCommand(c, 1, 0);
+}
+

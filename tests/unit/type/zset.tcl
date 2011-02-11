@@ -100,6 +100,41 @@ start_server {tags {"zset"}} {
         list [r zrank zranktmp x] [r zrank zranktmp z]
     } {0 1}
 
+    test "ZRANKORNEXT" {
+	assert_equal 1 [r zadd zrtmp 0 1]
+	assert_equal 1 [r zadd zrtmp 0 3]
+	assert_equal 1 [r zadd zrtmp 0 a]
+	assert_equal 1 [r zadd zrtmp 0 4]
+	assert_equal 1 [r zadd zrtmp 0 2]
+	assert_equal 0 [r zrankornext zrtmp 1]
+	assert_equal 1 [r zrankornext zrtmp 2]
+	assert_equal 2 [r zrankornext zrtmp 3]
+	assert_equal 3 [r zrankornext zrtmp 4]
+	assert_equal 4 [r zrankornext zrtmp a]
+	assert_equal 5 [r zrankornext zrtmp b]
+	assert_equal 0 [r zrankornext zrtmp 0]
+	assert_equal 1 [r zrankornext zrtmp 11]
+	assert_equal 5 [r zrankornext zrtmp aaa]
+	assert_equal 4 [r zrankornext zrtmp 9a9]
+	assert_equal 2 [r zrankornext zrtmp 222]
+    }
+
+    test "ZREVRANKORNEXT" {
+	# zrtmp { 1 2 3 4 a } [0-4]
+        #       5 4 3 2 1 0
+	assert_equal 4 [r zrevrankornext zrtmp 1]
+	assert_equal 3 [r zrevrankornext zrtmp 2]
+	assert_equal 2 [r zrevrankornext zrtmp 3]
+	assert_equal 1 [r zrevrankornext zrtmp 4]
+	assert_equal 0 [r zrevrankornext zrtmp a]
+	assert_equal 0 [r zrevrankornext zrtmp b]
+	assert_equal 5 [r zrevrankornext zrtmp 0]
+	assert_equal 4 [r zrevrankornext zrtmp 11]
+	assert_equal 0 [r zrevrankornext zrtmp aaa]
+	assert_equal 1 [r zrevrankornext zrtmp 9a9]
+	assert_equal 3 [r zrevrankornext zrtmp 222]	
+    }
+
     test {ZSCORE} {
         set aux {}
         set err {}

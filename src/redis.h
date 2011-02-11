@@ -1011,6 +1011,8 @@ void appendCommand(redisClient *c);
 void strlenCommand(redisClient *c);
 void zrankCommand(redisClient *c);
 void zrevrankCommand(redisClient *c);
+void zrankornextCommand(redisClient *c);
+void zrevrankornextCommand(redisClient *c);
 void hsetCommand(redisClient *c);
 void hsetnxCommand(redisClient *c);
 void hgetCommand(redisClient *c);
@@ -1035,6 +1037,8 @@ void publishCommand(redisClient *c);
 void watchCommand(redisClient *c);
 void unwatchCommand(redisClient *c);
 void ltosetstoreCommand(redisClient *c);
+void zrangebyscorestoreCommand(redisClient *c);
+void zrevrangebyscorestoreCommand(redisClient *c);
 
 #if defined(__GNUC__)
 void *calloc(size_t count, size_t size) __attribute__ ((deprecated));
