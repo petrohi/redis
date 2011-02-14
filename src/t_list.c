@@ -1014,3 +1014,100 @@ void ltosetstoreCommand(redisClient *c) {
     signalModifiedKey(c->db,c->argv[1]);
     server.dirty++;
 }
+
+extern dictType keyptrDictType;
+
+void lluniqueGeneric(redisClient *c, robj *save) {
+    robj *src, *dstlist, *tmp;
+    robj **argv;
+    dict *tdict;
+
+    argv=c->argv + (save ? 1 : 0); /* so we can move it in case of STORE */
+
+    /* find the source list */
+    if ((src=lookupKeyReadOrReply(c,argv[1],shared.emptymultibulk)) == NULL
+         || checkType(c,src,REDIS_LIST)) return;
+
+    tdict=dictCreate(&keyptrDictType, NULL);
+
+    if (src->encoding == REDIS_ENCODING_LINKEDLIST) {
+	listIter* it;
+        listNode* node;
+
+	dstlist = createListObject();
+        it = listGetIterator(src->ptr, AL_START_HEAD);
+	while ((node=listNext(it))!=NULL) {
+	    if (dictFind(tdict, node->value)==NULL) {
+	        listTypePush(dstlist, node->value, REDIS_TAIL);
+	        dictAdd(tdict, node->value, NULL);
+	    }
+        }
+        listReleaseIterator(it);
+	dictRelease(tdict);
+    }
+    else if (src->encoding == REDIS_ENCODING_ZIPLIST) {
+        unsigned char *p = ziplistIndex(src->ptr, ZIPLIST_HEAD);
+        unsigned char *vstr;
+        unsigned int   vlen;
+        long long vlong;
+	dstlist = createListObject();
+        while (p) {
+            ziplistGet(p,&vstr,&vlen,&vlong);
+            if (vstr) {
+		tmp=createStringObject((char*)vstr,vlen);
+            } else {
+                tmp=createStringObjectFromLongLong(vlong);
+            }
+	    if (dictFind(tdict, tmp)==NULL) {
+	        listTypePush(dstlist, tmp, REDIS_TAIL);
+	        dictAdd(tdict, tmp, NULL);
+	    }
+	    decrRefCount(tmp); 	    /* release tmp */
+            p = ziplistNext(src->ptr, p);
+        }
+	dictRelease(tdict);
+    }
+    else {
+	redisPanic("List encoding is not LINKEDLIST nor ZIPLIST!");
+    }
+
+    if (save) {
+        dbDelete(c->db,save);
+	if (listTypeLength(dstlist) > 0) {
+	    dbAdd(c->db,save,dstlist);
+	    addReplyLongLong(c,listTypeLength(dstlist));
+	} else {
+	    decrRefCount(dstlist);
+	    addReply(c,shared.czero);
+	}
+	signalModifiedKey(c->db,save);
+	server.dirty++;
+    }
+    else {
+        if (listTypeLength(dstlist) > 0) {
+	    /* Return the result in form of a multi-bulk reply */
+	    addReplyMultiBulkLen(c,listTypeLength(dstlist));
+
+	    listIter* it;
+	    listNode* node;
+	    it = listGetIterator(dstlist->ptr, AL_START_HEAD);
+	    while ((node=listNext(it))!=NULL) {
+	        addReplyBulk(c,node->value);
+	    }
+	    listTypeReleaseIterator(it);
+	}
+	else {
+	  addReply(c, shared.nullbulk);
+	}
+	decrRefCount(dstlist);
+    }
+}
+
+void lluniqueCommand(redisClient *c) {
+    lluniqueGeneric(c, NULL);
+}
+
+void lluniquestoreCommand(redisClient *c) {
+    lluniqueGeneric(c, c->argv[1]);
+}
+

@@ -1039,6 +1039,10 @@ void unwatchCommand(redisClient *c);
 void ltosetstoreCommand(redisClient *c);
 void zrangebyscorestoreCommand(redisClient *c);
 void zrevrangebyscorestoreCommand(redisClient *c);
+void zrangebyscorenkeyCommand(redisClient *c);
+void zrangebyscorenkeystoreCommand(redisClient *c);
+void lluniqueCommand(redisClient *c);
+void lluniquestoreCommand(redisClient *c);
 
 #if defined(__GNUC__)
 void *calloc(size_t count, size_t size) __attribute__ ((deprecated));

@@ -355,6 +355,8 @@ static int zslParseRange(robj *min, robj *max, zrangespec *spec) {
             if (eptr[0] != '\0' || isnan(spec->max)) return REDIS_ERR;
         }
     }
+    /* if (spec->min==spec->max && (spec->maxex || spec->minex))
+           return REDIS_ERR; */
 
     return REDIS_OK;
 }
@@ -1143,3 +1145,104 @@ void zrevrankornextCommand(redisClient *c) {
     zrankGenericCommand(c, 1, 0);
 }
 
+/* zrangebyscoreandkey zset score1 score2 key1 key2 */
+void zrangeByScoreAndKeyGeneric(redisClient *c, robj* save) {
+    robj *o, *dstl=NULL;
+    zset          *zs;
+    zskiplist     *zsl;
+    zskiplistNode *x, *first;
+
+    robj **argv;
+    int i, listsize=0;
+
+    zrangespec range;
+
+    argv=c->argv + (save ? 1 : 0); /* so we can move it in case of STORE */
+
+    if ((o = lookupKeyReadOrReply(c,argv[1],shared.nullbulk)) == NULL ||
+        checkType(c,o,REDIS_ZSET)) return;
+
+    zs = o->ptr;
+    zsl = zs->zsl;
+
+    /* Parse the range arguments. */
+    if (zslParseRange(argv[2],argv[3],&range) != REDIS_OK) {
+        addReplyError(c,"min or max is not a double");
+        return;
+    }
+    
+    argv[4] = tryObjectEncoding(argv[4]); /* key1 */
+    argv[5] = tryObjectEncoding(argv[5]); /* key2 */
+
+    if (save)
+      dbDelete(c->db,save);
+
+    x = zsl->header;
+    for (i = zsl->level-1; i >= 0; i--) {
+      while (x->level[i].forward &&
+	     ((range.minex ? x->level[i].forward->score <= range.min : x->level[i].forward->score < range.min) || 
+	     ((range.minex ? x->level[i].forward->score > range.min : x->level[i].forward->score >= range.min) &&
+	      compareStringObjects(x->level[i].forward->obj,argv[4]) < 0)))
+	x = x->level[i].forward;
+    }
+
+    if (x->level[0].forward &&
+	(range.maxex ? x->level[0].forward->score < range.max : x->level[0].forward->score <= range.max) &&
+	compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0) {
+      
+      x=x->level[0].forward;
+      first = x;
+      ++listsize;
+
+      while (x->level[0].forward &&
+	     (range.maxex ? x->level[0].forward->score < range.max : x->level[0].forward->score <= range.max) &&
+	     compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0) {
+	x = x->level[0].forward;
+	++listsize;
+      }
+      
+      if (x) 
+	x=x->level[0].forward;
+      
+      if (save) {
+	dstl = createZiplistObject();
+	while (first!=x) {
+	  listTypePush(dstl,first->obj, REDIS_TAIL);
+	  first=first->level[0].forward;
+	}
+
+	dbAdd(c->db,save,dstl);
+	addReplyLongLong(c,listsize);
+
+	signalModifiedKey(c->db,save);
+	server.dirty++;
+      }
+      else {
+        /* Return the result in form of a multi-bulk reply */
+        addReplyMultiBulkLen(c,listsize);
+
+	while (first!=x) {
+	  addReplyBulk(c,first->obj);
+	  first=first->level[0].forward;
+	}
+      }
+    }
+    else {
+      if (save) {
+	addReply(c,shared.czero);
+      }
+      else {
+	addReply(c,shared.nullbulk);
+      }
+    }
+}
+
+/* zrangebyscoreandkey zset score1 score2 key1 key2 */
+void zrangebyscorenkeyCommand(redisClient *c) {
+  zrangeByScoreAndKeyGeneric(c, NULL);
+}
+
+/* zrangebyscoreandkeystore zset dstlist score1 score2 key1 key2 */
+void zrangebyscorenkeystoreCommand(redisClient *c) {
+  zrangeByScoreAndKeyGeneric(c, c->argv[1]);
+}
