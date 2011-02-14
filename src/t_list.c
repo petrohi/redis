@@ -1017,10 +1017,11 @@ void ltosetstoreCommand(redisClient *c) {
 
 extern dictType keyptrDictType;
 
-void lluniqueGeneric(redisClient *c, robj *save) {
+void luniqueGeneric(redisClient *c, robj *save, int forward) {
     robj *src, *dstlist, *tmp;
     robj **argv;
     dict *tdict;
+    int insert = (forward ? REDIS_TAIL : REDIS_HEAD);
 
     argv=c->argv + (save ? 1 : 0); /* so we can move it in case of STORE */
 
@@ -1028,25 +1029,27 @@ void lluniqueGeneric(redisClient *c, robj *save) {
     if ((src=lookupKeyReadOrReply(c,argv[1],shared.emptymultibulk)) == NULL
          || checkType(c,src,REDIS_LIST)) return;
 
-    tdict=dictCreate(&keyptrDictType, NULL);
+    tdict=dictCreate(&setDictType, NULL);
 
     if (src->encoding == REDIS_ENCODING_LINKEDLIST) {
 	listIter* it;
         listNode* node;
-
 	dstlist = createListObject();
-        it = listGetIterator(src->ptr, AL_START_HEAD);
+        it = listGetIterator(src->ptr, (forward ? AL_START_HEAD : AL_START_TAIL));
+
 	while ((node=listNext(it))!=NULL) {
 	    if (dictFind(tdict, node->value)==NULL) {
-	        listTypePush(dstlist, node->value, REDIS_TAIL);
-	        dictAdd(tdict, node->value, NULL);
+	        listTypePush(dstlist, node->value, insert);
+	        if (dictAdd(tdict, node->value, NULL)!=DICT_OK)
+		    redisPanic("Cannot insert object into dict!");
+		incrRefCount(node->value);
 	    }
         }
         listReleaseIterator(it);
 	dictRelease(tdict);
     }
     else if (src->encoding == REDIS_ENCODING_ZIPLIST) {
-        unsigned char *p = ziplistIndex(src->ptr, ZIPLIST_HEAD);
+        unsigned char *p = ziplistIndex(src->ptr, (forward ? 0 : -1));
         unsigned char *vstr;
         unsigned int   vlen;
         long long vlong;
@@ -1058,19 +1061,23 @@ void lluniqueGeneric(redisClient *c, robj *save) {
             } else {
                 tmp=createStringObjectFromLongLong(vlong);
             }
-	    if (dictFind(tdict, tmp)==NULL) {
-	        listTypePush(dstlist, tmp, REDIS_TAIL);
-	        dictAdd(tdict, tmp, NULL);
+	    if (!dictFind(tdict, tmp)) {
+	        listTypePush(dstlist, tmp, insert);
+	        if (dictAdd(tdict, tmp, NULL)!=DICT_OK) {
+		    redisPanic("Cannot insert object into dict!");
+		}
+		incrRefCount(tmp); /* dict */
 	    }
-	    decrRefCount(tmp); 	    /* release tmp */
-            p = ziplistNext(src->ptr, p);
+	    else {
+	        decrRefCount(tmp); /* release tmp */
+	    }
+            p = (forward ? ziplistNext(src->ptr, p) : ziplistPrev(src->ptr, p));
         }
 	dictRelease(tdict);
     }
     else {
 	redisPanic("List encoding is not LINKEDLIST nor ZIPLIST!");
     }
-
     if (save) {
         dbDelete(c->db,save);
 	if (listTypeLength(dstlist) > 0) {
@@ -1087,14 +1094,13 @@ void lluniqueGeneric(redisClient *c, robj *save) {
         if (listTypeLength(dstlist) > 0) {
 	    /* Return the result in form of a multi-bulk reply */
 	    addReplyMultiBulkLen(c,listTypeLength(dstlist));
-
 	    listIter* it;
 	    listNode* node;
 	    it = listGetIterator(dstlist->ptr, AL_START_HEAD);
 	    while ((node=listNext(it))!=NULL) {
 	        addReplyBulk(c,node->value);
 	    }
-	    listTypeReleaseIterator(it);
+	    listReleaseIterator(it);
 	}
 	else {
 	  addReply(c, shared.nullbulk);
@@ -1104,10 +1110,17 @@ void lluniqueGeneric(redisClient *c, robj *save) {
 }
 
 void lluniqueCommand(redisClient *c) {
-    lluniqueGeneric(c, NULL);
+    luniqueGeneric(c, NULL, 1);
 }
 
 void lluniquestoreCommand(redisClient *c) {
-    lluniqueGeneric(c, c->argv[1]);
+    luniqueGeneric(c, c->argv[1], 1);
 }
 
+void lruniqueCommand(redisClient *c) {
+    luniqueGeneric(c, NULL, 0);
+}
+
+void lruniquestoreCommand(redisClient *c) {
+    luniqueGeneric(c, c->argv[1], 0);
+}

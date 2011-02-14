@@ -1043,6 +1043,8 @@ void zrangebyscorenkeyCommand(redisClient *c);
 void zrangebyscorenkeystoreCommand(redisClient *c);
 void lluniqueCommand(redisClient *c);
 void lluniquestoreCommand(redisClient *c);
+void lruniqueCommand(redisClient *c);
+void lruniquestoreCommand(redisClient *c);
 
 #if defined(__GNUC__)
 void *calloc(size_t count, size_t size) __attribute__ ((deprecated));
