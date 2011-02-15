@@ -67,6 +67,42 @@ start_server {
         assert_equal 0 [r llen mylist2]
     }
 
+    test {LdUNIQUE a list - ziplist} {
+	assert_equal 1 [r lpush ulist1 1]
+	assert_equal 2 [r lpush ulist1 2]
+	assert_equal 3 [r lpush ulist1 3]
+	assert_equal 4 [r lpush ulist1 4]
+	assert_equal 5 [r lpush ulist1 1]
+	assert_equal 6 [r lpush ulist1 2]
+	assert_equal 7 [r lpush ulist1 3]
+	assert_equal 8 [r lpush ulist1 5]
+	assert_equal 9 [r lpush ulist1 6]
+	assert_equal 10 [r lpush ulist1 7]
+	assert_equal 11 [r lpush ulist1 8]
+	assert_equal 12 [r lpush ulist1 9]
+	assert_encoding ziplist ulist1
+	assert_equal {9 8 7 6 5 3 2 1 4} [r llunique ulist1]
+	assert_equal {9 8 7 6 5 4 3 2 1} [r lrunique ulist1]
+	assert_equal 9 [r lluniquestore ull1 ulist1]
+	assert_equal 9 [r lruniquestore ulr1 ulist1]
+	assert_encoding linkedlist ull1
+	assert_encoding linkedlist ulr1
+	assert_equal {9 8 7 6 5 3 2 1 4} [r lrange ull1 0 -1]
+	assert_equal {9 8 7 6 5 4 3 2 1} [r lrange ulr1 0 -1]
+	assert_equal 13 [r lpush ulist1 $largevalue(linkedlist)]
+	assert_equal 14 [r lpush ulist1 aaa]
+	assert_encoding linkedlist ulist1
+	assert_equal "aaa $largevalue(linkedlist) 9 8 7 6 5 3 2 1 4" [r llunique ulist1]
+	assert_equal "aaa $largevalue(linkedlist) 9 8 7 6 5 4 3 2 1" [r lrunique ulist1]
+	assert_equal 11 [r lluniquestore ull1 ulist1]
+	assert_equal 11 [r lruniquestore ulr1 ulist1]
+	assert_equal "aaa $largevalue(linkedlist) 9 8 7 6 5 3 2 1 4" [r lrange ull1 0 -1]
+	assert_equal "aaa $largevalue(linkedlist) 9 8 7 6 5 4 3 2 1" [r lrange ulr1 0 -1]
+	assert_equal 1 [r del ulr1]
+	assert_equal 1 [r del ull1]
+	assert_equal 1 [r del ulist1]
+    }
+
     proc create_ziplist {key entries} {
         r del $key
         foreach entry $entries { r rpush $key $entry }
