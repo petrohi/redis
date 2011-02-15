@@ -1175,74 +1175,80 @@ void zrangeByScoreAndKeyGeneric(redisClient *c, robj* save) {
     argv[5] = tryObjectEncoding(argv[5]); /* key2 */
 
     if (save)
-      dbDelete(c->db,save);
+	dbDelete(c->db,save);
 
     x = zsl->header;
-    for (i = zsl->level-1; i >= 0; i--) {
-      while (x->level[i].forward &&
-	     ((range.minex ? x->level[i].forward->score <= range.min : x->level[i].forward->score < range.min) || 
-	     ((range.minex ? x->level[i].forward->score > range.min : x->level[i].forward->score >= range.min) &&
-	      compareStringObjects(x->level[i].forward->obj,argv[4]) < 0)))
-	x = x->level[i].forward;
+    for (i = zsl->level-1; i >= 0; --i) {
+	while (x->level[i].forward &&
+	       ((range.minex ?
+		 x->level[i].forward->score <= range.min :
+		 x->level[i].forward->score < range.min) || 
+		((range.minex ?
+		  x->level[i].forward->score > range.min :
+		  x->level[i].forward->score >= range.min) &&
+		 compareStringObjects(x->level[i].forward->obj,argv[4]) < 0)))
+	    x = x->level[i].forward;
     }
 
     if (x->level[0].forward &&
-	(range.maxex ? x->level[0].forward->score < range.max : x->level[0].forward->score <= range.max) &&
-	compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0) {
+	(x->level[0].forward->score < range.max || 
+	 (!range.maxex && x->level[0].forward->score == range.max &&
+	  compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0))) {
       
-      x=x->level[0].forward;
-      first = x;
-      ++listsize;
-
-      while (x->level[0].forward &&
-	     (range.maxex ? x->level[0].forward->score < range.max : x->level[0].forward->score <= range.max) &&
-	     compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0) {
-	x = x->level[0].forward;
-	++listsize;
-      }
-      
-      if (x) 
 	x=x->level[0].forward;
+	first = x;
+	++listsize;
+
+	while (x->level[0].forward &&
+	       (x->level[0].forward->score < range.max ||
+		(!range.maxex && x->level[0].forward->score == range.max &&
+		 compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0))) {
+	    x = x->level[0].forward;
+	    ++listsize;
+	}
       
-      if (save) {
-	dstl = createZiplistObject();
-	while (first!=x) {
-	  listTypePush(dstl,first->obj, REDIS_TAIL);
-	  first=first->level[0].forward;
+	if (x) 
+	    x=x->level[0].forward;
+      
+	if (save) {
+	    dstl = createZiplistObject();
+	    while (first!=x) {
+		listTypePush(dstl,first->obj, REDIS_TAIL);
+		first=first->level[0].forward;
+	    }
+
+	    dbAdd(c->db,save,dstl);
+	    addReplyLongLong(c,listsize);
+	    
+	    signalModifiedKey(c->db,save);
+	    server.dirty++;
 	}
+	else {
+	    /* Return the result in form of a multi-bulk reply */
+	    addReplyMultiBulkLen(c,listsize);
 
-	dbAdd(c->db,save,dstl);
-	addReplyLongLong(c,listsize);
-
-	signalModifiedKey(c->db,save);
-	server.dirty++;
-      }
-      else {
-        /* Return the result in form of a multi-bulk reply */
-        addReplyMultiBulkLen(c,listsize);
-
-	while (first!=x) {
-	  addReplyBulk(c,first->obj);
-	  first=first->level[0].forward;
+	    while (first!=x) {
+		addReplyBulk(c,first->obj);
+		first=first->level[0].forward;
+	    }
 	}
-      }
     }
     else {
-      if (save) {
-	addReply(c,shared.czero);
-      }
-      else {
-	addReply(c,shared.nullbulk);
-      }
+	if (save) {
+	    addReply(c,shared.czero);
+	}
+	else {
+	    addReply(c,shared.nullbulk);
+	}
     }
 }
 
 /* zrangebyscoreandkey zset score1 score2 key1 key2 */
 void zrangebyscorenkeyCommand(redisClient *c) {
-  zrangeByScoreAndKeyGeneric(c, NULL);
+    zrangeByScoreAndKeyGeneric(c, NULL);
 }
 
 /* zrangebyscoreandkeystore zset dstlist score1 score2 key1 key2 */
 void zrangebyscorenkeystoreCommand(redisClient *c) {
-  zrangeByScoreAndKeyGeneric(c, c->argv[1]);
+    zrangeByScoreAndKeyGeneric(c, c->argv[1]);
 }

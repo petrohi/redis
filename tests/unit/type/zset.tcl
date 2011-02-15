@@ -135,6 +135,22 @@ start_server {tags {"zset"}} {
 	assert_equal 3 [r zrevrankornext zrtmp 222]	
     }
 
+    test "ZRANGEBYSCORENKEY" {
+	# 0:{1 2 3 4 a} 1:{a1 a2 a3 a4}
+	assert_equal 1 [r zadd zrtmp 1 a1]
+	assert_equal 1 [r zadd zrtmp 1 a2]
+	assert_equal 1 [r zadd zrtmp 1 a3]
+	assert_equal 1 [r zadd zrtmp 1 a4]
+	assert_equal {1 2 3 4} [r zrangebyscorenkey zrtmp 0 0 1 4]
+	assert_equal {a1 a2 a3 a4} [r zrangebyscorenkey zrtmp 1 1 a f]
+	assert_equal {a a1 a2 a3 a4} [r zrangebyscorenkey zrtmp 0 1 a f]
+	assert_equal {1 2 3 4 a a1 a2 a3 a4} [r zrangebyscorenkey zrtmp 0 1 0 f]
+	assert_equal 1 [r zadd zrtmp 0.5 ff]
+	assert_equal {2 3 4 a ff} [r zrangebyscorenkey zrtmp 0 (1 2 f]
+	assert_equal {ff a1 a2 a3 a4} [r zrangebyscorenkey zrtmp (0 1 0 f]
+	assert_equal {ff} [r zrangebyscorenkey zrtmp (0 (1 0 f]
+    }
+
     test {ZSCORE} {
         set aux {}
         set err {}
