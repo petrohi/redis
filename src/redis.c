@@ -103,7 +103,7 @@ struct redisCommand redisCommandTable[] = {
     {"ltrim",ltrimCommand,4,0,NULL,1,1,1,0,0},
     {"lrem",lremCommand,4,0,NULL,1,1,1,0,0},
     {"rpoplpush",rpoplpushCommand,3,REDIS_CMD_DENYOOM,NULL,1,2,1,0,0},
-    {"ltosetstore",ltosetstoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
+    {"l2sstore",l2sstoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
     {"llunique",lluniqueCommand,2,REDIS_CMD_DENYOOM,NULL,1,1,1,0,0},
     {"lluniquestore",lluniquestoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
     {"lrunique",lruniqueCommand,2,REDIS_CMD_DENYOOM,NULL,1,1,1,0,0},

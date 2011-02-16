@@ -1036,7 +1036,7 @@ void punsubscribeCommand(redisClient *c);
 void publishCommand(redisClient *c);
 void watchCommand(redisClient *c);
 void unwatchCommand(redisClient *c);
-void ltosetstoreCommand(redisClient *c);
+void l2sstoreCommand(redisClient *c);
 void zrangebyscorestoreCommand(redisClient *c);
 void zrevrangebyscorestoreCommand(redisClient *c);
 void zrangebyscorenkeyCommand(redisClient *c);

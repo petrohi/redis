@@ -775,7 +775,7 @@ start_server {
 
     }
 
-    test {LTOSETSTORE - ziplist} {
+    test {L2SSTORE - ziplist} {
 	assert_equal 1 [r lpush myziplist3 a]
         assert_equal 2 [r rpush myziplist3 b]
         assert_equal 3 [r rpush myziplist3 c]
@@ -783,11 +783,11 @@ start_server {
         assert_equal 5 [r lpush myziplist3 c]
 	assert_equal 5 [r llen  myziplist3]
         assert_encoding ziplist myziplist3
-        assert_equal 4 [r ltosetstore myset myziplist3]
+        assert_equal 4 [r l2Sstore myset myziplist3]
         assert_equal 4 [r scard myset]
     }
 
-    test {LTOSETSTORE - regular list} {
+    test {L2SSTORE - regular list} {
         assert_equal 1 [r lpush mylist3 $largevalue(linkedlist)]
         assert_encoding linkedlist mylist3
         assert_equal 2 [r rpush mylist3 b]
@@ -795,10 +795,9 @@ start_server {
         assert_equal 4 [r lpush mylist3 d]
         assert_equal 5 [r lpush mylist3 c]
 	assert_equal 5 [r llen  mylist3]
-        assert_equal 4 [r ltosetstore myset2 mylist3]
+        assert_equal 4 [r l2sstore myset2 mylist3]
         assert_equal 4 [r scard myset2]
     }    
-
 }
 
 start_server {

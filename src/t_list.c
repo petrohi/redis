@@ -960,9 +960,9 @@ void brpoplpushCommand(redisClient *c) {
 }
 
 /*
- *  ltosetstore destination key
+ *  l2sstore destination key
  */
-void ltosetstoreCommand(redisClient *c) {
+void l2sstoreCommand(redisClient *c) {
     robj *src, *dstset = NULL, *tmp = NULL;
     
     /* find the source list */
