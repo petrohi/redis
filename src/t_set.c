@@ -600,14 +600,13 @@ void sdiffstoreCommand(redisClient *c) {
     sunionDiffGenericCommand(c,c->argv+2,c->argc-2,c->argv[1],REDIS_OP_DIFF);
 }
 
-
-/* SFOREACHS dest key pattern */
-void sforeachsCommand(redisClient *c) {
+/* SFOREACHSSTORE dest key pattern */
+void sforeachsstoreCommand(redisClient *c) {
     robj *set, *obj, *sobj, *skey, *pattern, *dstset;
     setTypeIterator *it, *it2;
     int prefix, postfix, plen;
 
-    if ((set=lookupKeyReadOrReply(c,c->argv[2],shared.czero))==NULL ||
+    if ((set=lookupKeyReadOrReply(c,c->argv[2],shared.nullbulk))==NULL ||
 	checkType(c,set,REDIS_SET) || checkType(c,c->argv[3],REDIS_STRING))
 	return;
 
@@ -675,5 +674,4 @@ void sforeachsCommand(redisClient *c) {
 
     signalModifiedKey(c->db,c->argv[1]);
     server.dirty++;
-  
 }
