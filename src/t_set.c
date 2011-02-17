@@ -599,3 +599,81 @@ void sdiffCommand(redisClient *c) {
 void sdiffstoreCommand(redisClient *c) {
     sunionDiffGenericCommand(c,c->argv+2,c->argc-2,c->argv[1],REDIS_OP_DIFF);
 }
+
+
+/* SFOREACHS dest key pattern */
+void sforeachsCommand(redisClient *c) {
+    robj *set, *obj, *sobj, *skey, *pattern, *dstset;
+    setTypeIterator *it, *it2;
+    int prefix, postfix, plen;
+
+    if ((set=lookupKeyReadOrReply(c,c->argv[2],shared.czero))==NULL ||
+	checkType(c,set,REDIS_SET) || checkType(c,c->argv[3],REDIS_STRING))
+	return;
+
+    pattern=getDecodedObject(c->argv[3]);   
+    plen=stringObjectLen(pattern);
+
+    prefix=0;
+    postfix=0;
+
+    if (plen>0) {
+	for (;prefix<plen && (((char*)(pattern->ptr))[prefix]!='*'); ++prefix);
+	if (prefix==plen) {
+	    addReply(c,shared.czero);
+	    decrRefCount(pattern);
+	    return;
+	}
+	postfix=plen-(prefix)-1;
+    }
+
+    dstset = createIntsetObject();
+
+    it=setTypeInitIterator(set);
+    while ((obj=setTypeNextObject(it))!=NULL) {
+	if (prefix==0 && postfix==0) {
+	    skey = getDecodedObject(obj);
+	}
+	else {
+	    robj *tmp=getDecodedObject(obj);
+	    size_t objs=stringObjectLen(tmp);
+	    skey=createStringObject(NULL,prefix+postfix+objs);
+	    if (prefix>0)
+		memcpy(skey->ptr,pattern->ptr,prefix);
+	    memcpy(((char*)(skey->ptr))+prefix,tmp->ptr,objs);
+	    if (postfix>0)
+		memcpy(((char*)(skey->ptr))+prefix+objs,
+		       ((char*)(pattern->ptr))+prefix+1,postfix);
+	    decrRefCount(tmp);
+	}
+	sobj=lookupKeyRead(c->db, skey);
+	if (sobj && sobj->type==REDIS_SET) {
+	    robj *tmp;
+	    it2=setTypeInitIterator(sobj);
+	    while ((tmp=setTypeNextObject(it2))!=NULL) {
+		setTypeAdd(dstset, tmp);
+		decrRefCount(tmp);
+	    }
+	    setTypeReleaseIterator(it2);
+	}
+	decrRefCount(skey);
+	decrRefCount(obj);
+    }
+    setTypeReleaseIterator(it);
+
+    decrRefCount(pattern);
+
+    dbDelete(c->db, c->argv[1]);
+    
+    if (setTypeSize(dstset) > 0) {
+	dbAdd(c->db,c->argv[1],dstset);
+	addReplyLongLong(c,setTypeSize(dstset));
+    } else {
+	decrRefCount(dstset);
+	addReply(c,shared.czero);
+    }
+
+    signalModifiedKey(c->db,c->argv[1]);
+    server.dirty++;
+  
+}
