@@ -108,6 +108,7 @@ struct redisCommand redisCommandTable[] = {
     {"lluniquestore",lluniquestoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
     {"lrunique",lruniqueCommand,2,REDIS_CMD_DENYOOM,NULL,1,1,1,0,0},
     {"lruniquestore",lruniquestoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
+    {"lforeachsstore",lforeachsstoreCommand,4,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
     {"sadd",saddCommand,3,REDIS_CMD_DENYOOM,NULL,1,1,1,0,0},
     {"srem",sremCommand,3,0,NULL,1,1,1,0,0},
     {"smove",smoveCommand,4,0,NULL,1,2,1,0,0},

@@ -1045,6 +1045,7 @@ void lluniqueCommand(redisClient *c);
 void lluniquestoreCommand(redisClient *c);
 void lruniqueCommand(redisClient *c);
 void lruniquestoreCommand(redisClient *c);
+void lforeachsstoreCommand(redisClient *c);
 void sforeachsstoreCommand(redisClient *c);
 
 #if defined(__GNUC__)

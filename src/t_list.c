@@ -1124,3 +1124,82 @@ void lruniqueCommand(redisClient *c) {
 void lruniquestoreCommand(redisClient *c) {
     luniqueGeneric(c, c->argv[1], 0);
 }
+
+/* LFOREACHSSTORE dest key pattern */
+void lforeachsstoreCommand(redisClient *c) {
+    robj *list, *obj, *sobj, *skey, *pattern, *dstlist;
+    int prefix, postfix, plen;
+    setTypeIterator  *si;
+    listTypeIterator *li;
+    listTypeEntry entry;
+
+    if ((list=lookupKeyReadOrReply(c,c->argv[2],shared.nullbulk))==NULL ||
+	checkType(c,list,REDIS_LIST) || checkType(c,c->argv[3],REDIS_STRING))
+	return;
+
+    pattern=getDecodedObject(c->argv[3]);   
+    plen=stringObjectLen(pattern);
+
+    prefix=0;
+    postfix=0;
+
+    if (plen>0) {
+	for (;prefix<plen && (((char*)(pattern->ptr))[prefix]!='*'); ++prefix);
+	if (prefix==plen) {
+	    addReply(c,shared.czero);
+	    decrRefCount(pattern);
+	    return;
+	}
+	postfix=plen-(prefix)-1;
+    }
+
+    dstlist = createListObject();
+
+    li=listTypeInitIterator(list,0,REDIS_TAIL);
+    while (listTypeNext(li,&entry)) {
+	obj=listTypeGet(&entry);
+	if (prefix==0 && postfix==0) {
+	    skey = getDecodedObject(obj);
+	}
+	else {
+	    robj *tmp=getDecodedObject(obj);
+	    size_t objs=stringObjectLen(tmp);
+	    skey=createStringObject(NULL,prefix+postfix+objs);
+	    if (prefix>0)
+		memcpy(skey->ptr,pattern->ptr,prefix);
+	    memcpy(((char*)(skey->ptr))+prefix,tmp->ptr,objs);
+	    if (postfix>0)
+		memcpy(((char*)(skey->ptr))+prefix+objs,
+		       ((char*)(pattern->ptr))+prefix+1,postfix);
+	    decrRefCount(tmp);
+	}
+	sobj=lookupKeyRead(c->db, skey);
+	if (sobj && sobj->type==REDIS_SET) {
+	    robj *tmp;
+	    si=setTypeInitIterator(sobj);
+	    while ((tmp=setTypeNextObject(si))!=NULL) {
+		listTypePush(dstlist, tmp, REDIS_TAIL);
+		decrRefCount(tmp);
+	    }
+	    setTypeReleaseIterator(si);
+	}
+	decrRefCount(skey);
+	decrRefCount(obj);
+    }
+    listTypeReleaseIterator(li);
+
+    decrRefCount(pattern);
+
+    dbDelete(c->db, c->argv[1]);
+    
+    if (listTypeLength(dstlist) > 0) {
+	dbAdd(c->db,c->argv[1],dstlist);
+	addReplyLongLong(c,listTypeLength(dstlist));
+    } else {
+	decrRefCount(dstlist);
+	addReply(c,shared.czero);
+    }
+
+    signalModifiedKey(c->db,c->argv[1]);
+    server.dirty++;
+}
