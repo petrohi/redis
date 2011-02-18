@@ -103,6 +103,29 @@ start_server {
 	assert_equal 1 [r del ulist1]
     }
 
+    test {LFOREACHSSTORE} {
+	assert_equal 1 [r rpush lidx 1]
+	assert_equal 2 [r rpush lidx 2]
+	assert_equal 3 [r rpush lidx 3]
+	assert_equal 4 [r rpush lidx 4]
+	assert_equal 5 [r rpush lidx 5]
+	assert_equal 1 [r sadd set1val 1]
+	assert_equal 1 [r sadd set1val 2]
+	assert_equal 1 [r sadd set1val 3]
+	assert_equal 1 [r sadd set2val a3]
+	assert_equal 1 [r sadd set2val a2]
+	assert_equal 1 [r sadd set2val a1]
+	assert_equal 1 [r sadd set3val set3a1]
+	assert_equal 1 [r sadd set4val set4a1]
+	assert_equal 1 [r sadd set5val set5a1]
+	assert_equal 1 [r sadd set5val 1]
+	assert_equal 1 [r sadd set5val 2]
+	assert_equal 1 [r sadd set5val 3]
+	assert_equal 1 [r sadd set5val 4]
+	assert_equal 1 [r sadd set5val 5]
+	assert_equal 14 [r lforeachsstore ldst lidx set*val]
+    }
+
     proc create_ziplist {key entries} {
         r del $key
         foreach entry $entries { r rpush $key $entry }
