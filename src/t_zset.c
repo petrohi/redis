@@ -1146,7 +1146,7 @@ void zrevrankornextCommand(redisClient *c) {
 }
 
 /* zrangebyscoreandkey zset score1 score2 key1 key2 */
-void zrangeByScoreAndKeyGeneric(redisClient *c, robj* save) {
+void zrangeByScoreAndMemberGeneric(redisClient *c, robj* save) {
     robj *o, *dstl=NULL;
     zset          *zs;
     zskiplist     *zsl;
@@ -1244,11 +1244,11 @@ void zrangeByScoreAndKeyGeneric(redisClient *c, robj* save) {
 }
 
 /* zrangebyscoreandkey zset score1 score2 key1 key2 */
-void zrangebyscorenkeyCommand(redisClient *c) {
-    zrangeByScoreAndKeyGeneric(c, NULL);
+void zrangebyscorenmemberCommand(redisClient *c) {
+    zrangeByScoreAndMemberGeneric(c, NULL);
 }
 
 /* zrangebyscoreandkeystore zset dstlist score1 score2 key1 key2 */
-void zrangebyscorenkeystoreCommand(redisClient *c) {
-    zrangeByScoreAndKeyGeneric(c, c->argv[1]);
+void zrangebyscorenmemberstoreCommand(redisClient *c) {
+    zrangeByScoreAndMemberGeneric(c, c->argv[1]);
 }
