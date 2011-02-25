@@ -533,9 +533,19 @@ typedef struct _redisSortObject {
     } u;
 } redisSortObject;
 
+typedef struct _redisPattern {
+    robj *pt;
+    int   p1;
+    int   p2;
+} redisPattern;
+
+int initPattern(redisPattern *p, robj *str);
+void releasePattern(redisPattern *p);
+robj* lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst);
+
 typedef struct _redisSortOperation {
     int type;
-    robj *pattern;
+    redisPattern pattern;
 } redisSortOperation;
 
 /* ZSETs use a specialized version of Skiplists */
@@ -1048,6 +1058,7 @@ void lruniquestoreCommand(redisClient *c);
 void lforeachsstoreCommand(redisClient *c);
 void sforeachsstoreCommand(redisClient *c);
 void groupsortCommand(redisClient *c);
+void groupsumCommand(redisClient *c);
 
 #if defined(__GNUC__)
 void *calloc(size_t count, size_t size) __attribute__ ((deprecated));

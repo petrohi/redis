@@ -602,65 +602,45 @@ void sdiffstoreCommand(redisClient *c) {
 
 /* SFOREACHSSTORE dest key pattern */
 void sforeachsstoreCommand(redisClient *c) {
-    robj *set, *obj, *sobj, *skey, *pattern, *dstset;
+    robj *set, *obj, *sobj, *tmp, *dstset;
     setTypeIterator *it, *it2;
-    int prefix, postfix, plen;
 
     if ((set=lookupKeyReadOrReply(c,c->argv[2],shared.nullbulk))==NULL ||
 	checkType(c,set,REDIS_SET) || checkType(c,c->argv[3],REDIS_STRING))
 	return;
 
-    pattern=getDecodedObject(c->argv[3]);   
-    plen=stringObjectLen(pattern);
+    redisPattern pattern;
 
-    prefix=0;
-    postfix=0;
-
-    if (plen>0) {
-	for (;prefix<plen && (((char*)(pattern->ptr))[prefix]!='*'); ++prefix);
-	if (prefix==plen) {
-	    addReply(c,shared.czero);
-	    decrRefCount(pattern);
-	    return;
-	}
-	postfix=plen-(prefix)-1;
+    if (initPattern(&pattern,c->argv[3])!=REDIS_OK) {
+	addReply(c,shared.czero);
+	releasePattern(&pattern);
+	return;
     }
-
+	
     dstset = createIntsetObject();
 
     it=setTypeInitIterator(set);
     while ((obj=setTypeNextObject(it))!=NULL) {
-	if (prefix==0 && postfix==0) {
-	    skey = getDecodedObject(obj);
-	}
-	else {
-	    robj *tmp=getDecodedObject(obj);
-	    size_t objs=stringObjectLen(tmp);
-	    skey=createStringObject(NULL,prefix+postfix+objs);
-	    if (prefix>0)
-		memcpy(skey->ptr,pattern->ptr,prefix);
-	    memcpy(((char*)(skey->ptr))+prefix,tmp->ptr,objs);
-	    if (postfix>0)
-		memcpy(((char*)(skey->ptr))+prefix+objs,
-		       ((char*)(pattern->ptr))+prefix+1,postfix);
-	    decrRefCount(tmp);
-	}
-	sobj=lookupKeyRead(c->db, skey);
-	if (sobj && sobj->type==REDIS_SET) {
-	    robj *tmp;
-	    it2=setTypeInitIterator(sobj);
-	    while ((tmp=setTypeNextObject(it2))!=NULL) {
-		setTypeAdd(dstset, tmp);
-		decrRefCount(tmp);
+	sobj=lookupKeyByPatternS(c->db, &pattern, obj);
+	if (sobj) {
+	    if (sobj->type==REDIS_SET) {
+		it2=setTypeInitIterator(sobj);
+		while ((tmp=setTypeNextObject(it2))!=NULL) {
+		    setTypeAdd(dstset, tmp);
+		    decrRefCount(tmp);
+		}
+		setTypeReleaseIterator(it2);
 	    }
-	    setTypeReleaseIterator(it2);
+	    else if (sobj->type==REDIS_STRING) {
+		setTypeAdd(dstset, sobj);
+	    }
+	    decrRefCount(sobj);
 	}
-	decrRefCount(skey);
 	decrRefCount(obj);
     }
     setTypeReleaseIterator(it);
 
-    decrRefCount(pattern);
+    releasePattern(&pattern);
 
     dbDelete(c->db, c->argv[1]);
     

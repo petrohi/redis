@@ -191,6 +191,7 @@ struct redisCommand redisCommandTable[] = {
     {"flushall",flushallCommand,1,0,NULL,0,0,0,0,0},
     {"sort",sortCommand,-2,REDIS_CMD_DENYOOM,NULL,1,1,1,0,0},
     {"groupsort", groupsortCommand,-6,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
+    {"groupsum", groupsumCommand,-4,REDIS_CMD_DENYOOM,NULL,2,2,1,0,0},
     {"info",infoCommand,-1,0,NULL,0,0,0,0,0},
     {"monitor",monitorCommand,1,0,NULL,0,0,0,0,0},
     {"ttl",ttlCommand,2,0,NULL,1,1,1,0,0},
