@@ -539,10 +539,6 @@ typedef struct _redisPattern {
     int   p2;
 } redisPattern;
 
-int initPattern(redisPattern *p, robj *str);
-void releasePattern(redisPattern *p);
-robj* lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst);
-
 typedef struct _redisSortOperation {
     int type;
     redisPattern pattern;
@@ -569,6 +565,14 @@ typedef struct zset {
     dict *dict;
     zskiplist *zsl;
 } zset;
+
+/* Struct to hold a inclusive/exclusive range spec. */
+typedef struct {
+    double min, max;
+    int minex, maxex; /* are min or max exclusive? */
+} zrangespec;
+
+int zslParseRange(robj *min, robj *max, zrangespec *spec);
 
 /* DIsk store threaded I/O request message */
 #define REDIS_IOJOB_LOAD 0
@@ -1001,12 +1005,10 @@ void msetnxCommand(redisClient *c);
 void zaddCommand(redisClient *c);
 void zincrbyCommand(redisClient *c);
 void zrangeCommand(redisClient *c);
-void zrangestoreCommand(redisClient *c);
 void zrangebyscoreCommand(redisClient *c);
 void zrevrangebyscoreCommand(redisClient *c);
 void zcountCommand(redisClient *c);
 void zrevrangeCommand(redisClient *c);
-void zrevrangestoreCommand(redisClient *c);
 void zcardCommand(redisClient *c);
 void zremCommand(redisClient *c);
 void zscoreCommand(redisClient *c);
@@ -1021,8 +1023,6 @@ void appendCommand(redisClient *c);
 void strlenCommand(redisClient *c);
 void zrankCommand(redisClient *c);
 void zrevrankCommand(redisClient *c);
-void zrankornextCommand(redisClient *c);
-void zrevrankornextCommand(redisClient *c);
 void hsetCommand(redisClient *c);
 void hsetnxCommand(redisClient *c);
 void hgetCommand(redisClient *c);
@@ -1046,19 +1046,6 @@ void punsubscribeCommand(redisClient *c);
 void publishCommand(redisClient *c);
 void watchCommand(redisClient *c);
 void unwatchCommand(redisClient *c);
-void l2sstoreCommand(redisClient *c);
-void zrangebyscorestoreCommand(redisClient *c);
-void zrevrangebyscorestoreCommand(redisClient *c);
-void zrangebyscorenmemberCommand(redisClient *c);
-void zrangebyscorenmemberstoreCommand(redisClient *c);
-void lluniqueCommand(redisClient *c);
-void lluniquestoreCommand(redisClient *c);
-void lruniqueCommand(redisClient *c);
-void lruniquestoreCommand(redisClient *c);
-void lforeachsstoreCommand(redisClient *c);
-void sforeachsstoreCommand(redisClient *c);
-void groupsortCommand(redisClient *c);
-void groupsumCommand(redisClient *c);
 
 #if defined(__GNUC__)
 void *calloc(size_t count, size_t size) __attribute__ ((deprecated));

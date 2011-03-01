@@ -28,6 +28,7 @@
  */
 
 #include "redis.h"
+#include "meshin.h"
 
 #ifdef HAVE_BACKTRACE
 #include <execinfo.h>
