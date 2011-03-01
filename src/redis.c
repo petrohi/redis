@@ -28,6 +28,7 @@
  */
 
 #include "redis.h"
+#include "meshin.h"
 
 #ifdef HAVE_BACKTRACE
 #include <execinfo.h>
@@ -132,6 +133,25 @@ struct redisCommand readonlyCommandTable[] = {
     {"zscore",zscoreCommand,3,0,NULL,1,1,1},
     {"zrank",zrankCommand,3,0,NULL,1,1,1},
     {"zrevrank",zrevrankCommand,3,0,NULL,1,1,1},
+
+    {"groupsort", groupsortCommand,-6,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"groupsum", groupsumCommand,-4,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"l2sstore",l2sstoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"llunique",lluniqueCommand,2,REDIS_CMD_DENYOOM,NULL,1,1,1},
+    {"lluniquestore",lluniquestoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"lrunique",lruniqueCommand,2,REDIS_CMD_DENYOOM,NULL,1,1,1},
+    {"lruniquestore",lruniquestoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"lforeachsstore",lforeachsstoreCommand,4,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"sforeachsstore",sforeachsstoreCommand,4,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"zrangestore",zrangestoreCommand,5,0,NULL,1,1,1},
+    {"zrevrangestore",zrevrangestoreCommand,5,0,NULL,1,1,1},
+    {"zrangebyscorestore",zrangebyscorestoreCommand,5,0,NULL,2,2,1},
+    {"zrevrangebyscorestore",zrevrangebyscorestoreCommand,5,0,NULL,2,2,1},
+    {"zrangebyscorenmember",     zrangebyscorenmemberCommand,     6,0,NULL,1,1,1},
+    {"zrangebyscorenmemberstore",zrangebyscorenmemberstoreCommand,7,0,NULL,2,2,1},
+    {"zrankornext",zrankornextCommand,3,0,NULL,1,1,1},
+    {"zrevrankornext",zrevrankornextCommand,3,0,NULL,1,1,1},
+
     {"hset",hsetCommand,4,REDIS_CMD_DENYOOM,NULL,1,1,1},
     {"hsetnx",hsetnxCommand,4,REDIS_CMD_DENYOOM,NULL,1,1,1},
     {"hget",hgetCommand,3,0,NULL,1,1,1},

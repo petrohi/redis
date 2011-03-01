@@ -529,9 +529,15 @@ typedef struct _redisSortObject {
     } u;
 } redisSortObject;
 
+typedef struct _redisPattern {
+    robj *pt;
+    int   p1;
+    int   p2;
+} redisPattern;
+
 typedef struct _redisSortOperation {
     int type;
-    robj *pattern;
+    redisPattern pattern;
 } redisSortOperation;
 
 /* ZSETs use a specialized version of Skiplists */
@@ -555,6 +561,14 @@ typedef struct zset {
     dict *dict;
     zskiplist *zsl;
 } zset;
+
+/* Struct to hold a inclusive/exclusive range spec. */
+typedef struct {
+    double min, max;
+    int minex, maxex; /* are min or max exclusive? */
+} zrangespec;
+
+int zslParseRange(robj *min, robj *max, zrangespec *spec);
 
 /* VM threaded I/O request message */
 #define REDIS_IOJOB_LOAD 0          /* Load from disk to memory */
