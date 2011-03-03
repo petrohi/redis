@@ -200,8 +200,8 @@ redisSortObject* sortVectorEx(redisClient *c, robj *sortval,
             robj *byval;
             if (sortby->pt) {
                 /* lookup value to sort by */
-                byval = lookupKeyByPatternS(c->db,sortby,vector[j].obj);
-                if (!byval) continue;
+                byval = lookupKeyByPatternS(c->db,sortby,vector[j].obj,1); 
+		if (!byval) continue;
             } else {
                 /* use object itself to sort by */
                 byval = vector[j].obj;
@@ -349,7 +349,7 @@ void sortCommand(redisClient *c) {
             while((ln = listNext(&li))) {
                 redisSortOperation *sop = ln->value;
                 // robj *val = lookupKeyByPattern(c->db,sop->pattern,vector[j].obj);
-		robj *val = lookupKeyByPatternS(c->db,&(sop->pattern),vector[j].obj);
+		robj *val = lookupKeyByPatternS(c->db,&(sop->pattern),vector[j].obj,1);
 
                 if (sop->type == REDIS_SORT_GET) {
                     if (!val) {
@@ -378,7 +378,7 @@ void sortCommand(redisClient *c) {
                 while((ln = listNext(&li))) {
                     redisSortOperation *sop = ln->value;
                     robj *val = lookupKeyByPatternS(c->db,&(sop->pattern),
-						    vector[j].obj);
+						    vector[j].obj,1);
 
                     if (sop->type == REDIS_SORT_GET) {
                         if (!val) val = createStringObject("",0);

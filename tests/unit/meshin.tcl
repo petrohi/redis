@@ -5,6 +5,36 @@ start_server {
         "list-max-ziplist-entries" 256
     }
 } {
+    test {GROUPSUM wrong number of arguments, low} {
+	catch {r groupsum sumlist keylist keys* } err
+	format $err
+    } {ERR*}
+
+    test {GROUPSORT wrong number of arguments, low} {
+	catch {r groupsort sortlist keylist keys* 0 -1} err
+	format $err
+    } {ERR*}
+
+    test {GROUPSORT wrong number of arguments, high} {
+	catch {r groupsort sortlist keylist keys* sortp* 0 -1 DESC ALPHA HIGH} err
+	format $err
+    } {ERR*}
+
+    test {GROUPSORT wrong arguments} {
+	catch {r groupsort sortlist keylist keys* sortp* 0 -1 DESC ALPH} err
+	format $err
+    } {ERR*}
+
+    test {GROUPSORT wrong arguments} {
+	catch {r groupsort sortlist keylist keys* sortp* 0 -1 ALPH} err
+	format $err
+    } {ERR*}
+
+    test {GROUPSORT wrong arguments} {
+	catch {r groupsort sortlist keylist keys* sortp* 0 -1 ALPHA DESC} err
+	format $err
+    } {ERR*}
+
     test {GROUPSUM} {
 	assert_equal 1 [r rpush keylist 1]
 	assert_equal 2 [r rpush keylist 2]
@@ -26,6 +56,39 @@ start_server {
 	assert_equal OK [r set sss3 300]
 	assert_equal 9 [r groupsum sumlist keylist keys* s* ss* sss*]
 	assert_equal {111 222 333 100 200 300 11 22 33} [r lrange sumlist 0 -1]
+	assert_equal 1 [r hset hp s1 1]
+	assert_equal 1 [r hset hp s2 10]
+	assert_equal 1 [r hset hp s3 100]
+	assert_equal 1 [r hset hp ss1 2]
+	assert_equal 1 [r hset hp ss2 20]
+	assert_equal 1 [r hset hp ss3 200]
+	assert_equal 1 [r hset hp sss1 3]
+	assert_equal 1 [r hset hp sss2 30]
+	assert_equal 1 [r hset hp sss3 300]
+	assert_equal 9 [r groupsum sumlist keylist keys* hp->s* hp->ss* hp->sss*]
+	assert_equal {111 222 333 100 200 300 11 22 33} [r lrange sumlist 0 -1]
+    }
+
+    test {GROUPSORT} {
+	assert_equal OK [r set sby1 9]
+	assert_equal OK [r set sby2 8]
+	assert_equal OK [r set sby3 7]
+	assert_equal 6 [r groupsort sortlist keylist keys* sby* 0 -1 ASC]
+	assert_equal {3 2 1 3 2 1} [r lrange sortlist 0 -1]
+	assert_equal 6 [r groupsort sortlist keylist keys* sby* 0 -1 DESC]
+	assert_equal {1 2 3 3 1 2} [r lrange sortlist 0 -1]
+	assert_equal OK [r set sby1 aaa]
+	assert_equal OK [r set sby2 a]
+	assert_equal OK [r set sby3 b]
+	assert_equal 6 [r groupsort sortlist keylist keys* sby* 0 -1 ASC]
+	assert_equal {1 2 3 3 1 2} [r lrange sortlist 0 -1]
+	assert_equal 6 [r groupsort sortlist keylist keys* sby* 0 -1 ASC ALPHA]
+	assert_equal {2 1 3 3 2 1} [r lrange sortlist 0 -1]
+	assert_equal 1 [r hset hby k1 aaa]
+	assert_equal 1 [r hset hby k2 a]
+	assert_equal 1 [r hset hby k3 b]
+	assert_equal 6 [r groupsort sortlist keylist keys* hby->k* 0 -1 ASC ALPHA]
+	assert_equal {2 1 3 3 2 1} [r lrange sortlist 0 -1]
     }
 
     # We need a value larger than list-max-ziplist-value to make sure
