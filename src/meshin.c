@@ -1,6 +1,12 @@
 #include "redis.h"
 #include "meshin.h"
 
+extern
+redisSortObject* sortVectorEx(redisClient *c, robj *sortval,
+			      int desc, int alpha, int *lstart, int *lcount,
+			      int dontsort, redisPattern* sortby, int *lvector);
+
+
 //
 //  Meshin specific commands
 //
@@ -504,29 +510,28 @@ void groupsumCommand(redisClient *c) {
     setTypeIterator *it;
     robj *obj, *sobj, *tmp;
 
+    long long *accu = zmalloc(sizeof(long long)*nptn);
+
     while (listTypeNext(li,&entry)) {
 	obj=listTypeGet(&entry);
 	sobj=lookupKeyByPatternS(c->db, &pattern, obj);
+	memset(accu, 0, sizeof(long long)*nptn);
 	if (sobj) {
 	    switch (sobj->type) {
 	    case REDIS_SET : {
 		it=setTypeInitIterator(sobj);
 		while ((tmp=setTypeNextObject(it))!=NULL) {
-		    long long accu=0; /* int64_t? */
 		    for (int i=0; i<nptn; ++i) {
 			robj *sumobj=lookupKeyByPatternS(c->db, &(ptn[i]), tmp);
 			if (sumobj) {
 			    if (sumobj->type == REDIS_STRING) {
 				long long value;
 				if (getLongLongFromObject(sumobj, &value)==REDIS_OK)
-				    accu+=value;
+				    accu[i]+=value;
 			    }
 			    decrRefCount(sumobj);
 			}
 		    }
-		    decrRefCount(tmp);
-		    tmp=createStringObjectFromLongLong(accu);
-		    listTypePush(dst, tmp, REDIS_TAIL);
 		    decrRefCount(tmp);
 		}
 		setTypeReleaseIterator(it);
@@ -537,8 +542,15 @@ void groupsumCommand(redisClient *c) {
 	    decrRefCount(sobj);
 	}
 	decrRefCount(obj);
+	for (int i=0; i<nptn; ++i) {
+	    tmp=createStringObjectFromLongLong(accu[i]);
+	    listTypePush(dst, tmp, REDIS_TAIL);
+	    decrRefCount(tmp);
+	}
     }
     listTypeReleaseIterator(li);
+
+    zfree(accu);
 
     for (int i=0; i<nptn; ++i)
 	releasePattern(&(ptn[i]));
