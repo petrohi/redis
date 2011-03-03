@@ -17,10 +17,6 @@ redisSortObject* sortVectorEx(redisClient *c, robj *sortval,
 
 // 2.2.x port, signalModifiedKey -> touchWatchedKey
 #define signalModifiedKey touchWatchedKey
-redisSortObject* sortVectorEx(redisClient *c, robj *sortval,
-			      int desc, int alpha, int *lstart, int *lcount,
-			      int dontsort, redisPattern* sortby, int *lvector);
-
 
 //  L2SSTORE destination key
 void l2sstoreCommand(redisClient *c) {
@@ -188,7 +184,7 @@ void lforeachsstoreCommand(redisClient *c) {
     li=listTypeInitIterator(list,0,REDIS_TAIL);
     while (listTypeNext(li,&entry)) {
 	obj=listTypeGet(&entry);
-	sobj = lookupKeyByPatternS(c->db, &pattern, obj);
+	sobj = lookupKeyByPatternS(c->db, &pattern, obj, 0);
 	if (sobj) {
 	    if (sobj->type==REDIS_SET) {
 		si=setTypeInitIterator(sobj);
@@ -247,7 +243,7 @@ void sforeachsstoreCommand(redisClient *c) {
 
     it=setTypeInitIterator(set);
     while ((obj=setTypeNextObject(it))!=NULL) {
-	sobj=lookupKeyByPatternS(c->db, &pattern, obj);
+	sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
 	if (sobj) {
 	    if (sobj->type==REDIS_SET) {
 		it2=setTypeInitIterator(sobj);
@@ -425,7 +421,7 @@ void groupsortstore(redisClient *c,
 
     while (listTypeNext(li,&entry)) {
 	obj=listTypeGet(&entry);
-	robj *sobj=lookupKeyByPatternS(c->db, &pattern, obj);
+	robj *sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
 	if (sobj) {
 	    if (sobj->type==REDIS_SET ||
 		sobj->type==REDIS_ZSET || sobj->type==REDIS_LIST) {
@@ -474,13 +470,27 @@ void groupsortstore(redisClient *c,
 
 /* GROUPSORT dst-list key-list key-pattern sort-pattern limit_min limit_count [ASC|DESC] [ALPHA] */
 void groupsortCommand(redisClient *c) {
+    if (c->argc>9) {
+	addReplyError(c,"wrong number of arguments for GROUPSORT");
+	return;
+    }
     int desc=0, alpha=0;
     int limit_start = atoi(c->argv[5]->ptr);
     int limit_count = atoi(c->argv[6]->ptr);
-    if (c->argc>6 && !strcasecmp(c->argv[7]->ptr,"desc"))
-	desc=1;
-    if (c->argc>6 && !strcasecmp(c->argv[c->argc-1]->ptr,"alpha"))
-	alpha=1;
+    if (c->argc>7) {
+	if (!strcasecmp(c->argv[c->argc-1]->ptr,"alpha"))
+	    alpha=1;
+	if (c->argc==9 && alpha==0) {
+	    addReplyErrorFormat(c,"wrong argument '%s' for GROUPSORT command",(char*)(c->argv[8]->ptr));
+	    return;
+	}
+	if (!strcasecmp(c->argv[7]->ptr,"desc")) {
+	    desc=1;
+	} else if (alpha==0 && strcasecmp(c->argv[7]->ptr,"asc")) {
+	    addReplyErrorFormat(c,"wrong argument '%s' for GROUPSORT command",(char*)(c->argv[7]->ptr));
+	    return;
+	}
+    }
     groupsortstore(c, c->argv[1], c->argv[2], c->argv[3], c->argv[4], limit_start, limit_count, desc, alpha);
 }
 
@@ -514,7 +524,7 @@ void groupsumCommand(redisClient *c) {
 
     while (listTypeNext(li,&entry)) {
 	obj=listTypeGet(&entry);
-	sobj=lookupKeyByPatternS(c->db, &pattern, obj);
+	sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
 	memset(accu, 0, sizeof(long long)*nptn);
 	if (sobj) {
 	    switch (sobj->type) {
@@ -522,13 +532,11 @@ void groupsumCommand(redisClient *c) {
 		it=setTypeInitIterator(sobj);
 		while ((tmp=setTypeNextObject(it))!=NULL) {
 		    for (int i=0; i<nptn; ++i) {
-			robj *sumobj=lookupKeyByPatternS(c->db, &(ptn[i]), tmp);
+			robj *sumobj=lookupKeyByPatternS(c->db, &(ptn[i]), tmp, 1);
 			if (sumobj) {
-			    if (sumobj->type == REDIS_STRING) {
-				long long value;
-				if (getLongLongFromObject(sumobj, &value)==REDIS_OK)
-				    accu[i]+=value;
-			    }
+			    long long value;
+			    if (getLongLongFromObject(sumobj, &value)==REDIS_OK)
+				accu[i]+=value;
 			    decrRefCount(sumobj);
 			}
 		    }
@@ -631,7 +639,7 @@ void releasePattern(redisPattern *p) {
     p->p2=-1;
 }
 
-robj *lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst) {
+robj *lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst, int stringOnly) {
     if (p->p1==-1 && p->p2==-1) {
         incrRefCount(subst);
         return subst;
@@ -714,7 +722,10 @@ robj *lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst) {
     } else {
         /* Every object that this function returns needs to have its refcount
          * increased. sortCommand decreases it again. */
-        incrRefCount(o);
+	if (stringOnly && o->type!=REDIS_STRING) 
+	    return NULL;
+	else 
+	    incrRefCount(o);
     }
     return o;
 }

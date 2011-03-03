@@ -28,6 +28,6 @@ void zrevrankornextCommand(redisClient *c);
 /* redisPattern interface */
 int initPattern(redisPattern *p, robj *str);
 void releasePattern(redisPattern *p);
-robj* lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst);
+robj* lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst, int stringOnly);
 
 #endif

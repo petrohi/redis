@@ -134,8 +134,8 @@ struct redisCommand readonlyCommandTable[] = {
     {"zrank",zrankCommand,3,0,NULL,1,1,1},
     {"zrevrank",zrevrankCommand,3,0,NULL,1,1,1},
 
-    {"groupsort", groupsortCommand,-6,REDIS_CMD_DENYOOM,NULL,2,2,1},
-    {"groupsum", groupsumCommand,-4,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"groupsort", groupsortCommand,-7,REDIS_CMD_DENYOOM,NULL,2,2,1},
+    {"groupsum", groupsumCommand,-5,REDIS_CMD_DENYOOM,NULL,2,2,1},
     {"l2sstore",l2sstoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1},
     {"llunique",lluniqueCommand,2,REDIS_CMD_DENYOOM,NULL,1,1,1},
     {"lluniquestore",lluniquestoreCommand,3,REDIS_CMD_DENYOOM,NULL,2,2,1},
