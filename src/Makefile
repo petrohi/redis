@@ -74,7 +74,7 @@ redis-check-aof: $(CHECKAOFOBJ)
 clean:
 	rm -rf $(PRGNAME) $(BENCHPRGNAME) $(CLIPRGNAME) $(CHECKDUMPPRGNAME) $(CHECKAOFPRGNAME) *.o *.gcda *.gcno *.gcov
 
-.depend:
+.depend dep:
 	$(CC) -MM *.c -I ../deps/hiredis -I ../deps/linenoise > .depend
 
 test: redis-server
