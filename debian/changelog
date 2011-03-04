@@ -1,5 +1,13 @@
+redis (2:2.2.2-meshin-0) stable; urgency=low
+
+  * redis 2.2.2 is a bugfix release.
+  * meshin 2.2.2-stable
+
+ -- Maxim Bolotin <maxim@meshin.com>  Fri, 4 Mar 2011 14:25:53 +0800
+
 redis (2:2.2.1-meshin-0) stable; urgency=low
 
+  * redis 2.2.1 is a bugfix release.
   * meshin 2.2.1-stable
 
  -- Maxim Bolotin <maxim@meshin.com>  Thu, 3 Mar 2011 21:30:00 +0800
