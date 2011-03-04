@@ -1,3 +1,9 @@
+redis (2:2.2.1-meshin-0) stable; urgency=low
+
+  * meshin 2.2.1-stable
+
+ -- Maxim Bolotin <maxim@meshin.com>  Thu, 3 Mar 2011 21:30:00 +0800
+
 redis (2:2.2.0-meshin-0) unstable; urgency=low
 
   * meshin 2.2-unstable
