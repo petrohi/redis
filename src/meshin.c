@@ -3,8 +3,8 @@
 
 extern
 redisSortObject* sortVectorEx(redisClient *c, robj *sortval,
-			      int desc, int alpha, int *lstart, int *lcount,
-			      int dontsort, redisPattern* sortby, int *lvector);
+                              int desc, int alpha, int *lstart, int *lcount,
+                              int dontsort, redisPattern* sortby, int *lvector);
 
 
 //
@@ -21,7 +21,7 @@ void l2sstoreCommand(redisClient *c) {
     
     /* find the source list */
     if ((src=lookupKeyReadOrReply(c,c->argv[2],shared.emptymultibulk)) == NULL
-         || checkType(c,src,REDIS_LIST)) return;
+        || checkType(c,src,REDIS_LIST)) return;
 
     robj *dstset = createIntsetObject();
 
@@ -29,20 +29,20 @@ void l2sstoreCommand(redisClient *c) {
     listTypeIterator *li=listTypeInitIterator(src,0,REDIS_TAIL);
 
     while (listTypeNext(li,&entry)) {
-	robj *obj=listTypeGet(&entry);
-	setTypeAdd(dstset, obj);
-	decrRefCount(obj);
+        robj *obj=listTypeGet(&entry);
+        setTypeAdd(dstset, obj);
+        decrRefCount(obj);
     }
     listTypeReleaseIterator(li);
     
     dbDelete(c->db,c->argv[1]);
 
     if (setTypeSize(dstset) > 0) {
-	dbAdd(c->db,c->argv[1],dstset);
-	addReplyLongLong(c,setTypeSize(dstset));
+        dbAdd(c->db,c->argv[1],dstset);
+        addReplyLongLong(c,setTypeSize(dstset));
     } else {
-	decrRefCount(dstset);
-	addReply(c,shared.czero);
+        decrRefCount(dstset);
+        addReply(c,shared.czero);
     }
 
     signalModifiedKey(c->db,c->argv[1]);
@@ -60,85 +60,85 @@ void luniqueGeneric(redisClient *c, robj *save, int forward) {
 
     /* find the source list */
     if ((src=lookupKeyReadOrReply(c,argv[1],shared.emptymultibulk)) == NULL
-         || checkType(c,src,REDIS_LIST)) return;
+        || checkType(c,src,REDIS_LIST)) return;
 
     tdict=dictCreate(&setDictType, NULL);
 
     if (src->encoding == REDIS_ENCODING_LINKEDLIST) {
-	listIter* it;
+        listIter* it;
         listNode* node;
-	dstlist = createListObject();
+        dstlist = createListObject();
         it = listGetIterator(src->ptr, (forward ? AL_START_HEAD : AL_START_TAIL));
 
-	while ((node=listNext(it))!=NULL) {
-	    if (dictFind(tdict, node->value)==NULL) {
-	        listTypePush(dstlist, node->value, insert);
-	        if (dictAdd(tdict, node->value, NULL)!=DICT_OK)
-		    redisPanic("Cannot insert object into dict!");
-		incrRefCount(node->value);
-	    }
+        while ((node=listNext(it))!=NULL) {
+            if (dictFind(tdict, node->value)==NULL) {
+                listTypePush(dstlist, node->value, insert);
+                if (dictAdd(tdict, node->value, NULL)!=DICT_OK)
+                    redisPanic("Cannot insert object into dict!");
+                incrRefCount(node->value);
+            }
         }
         listReleaseIterator(it);
-	dictRelease(tdict);
+        dictRelease(tdict);
     }
     else if (src->encoding == REDIS_ENCODING_ZIPLIST) {
         unsigned char *p = ziplistIndex(src->ptr, (forward ? 0 : -1));
         unsigned char *vstr;
         unsigned int   vlen;
         long long vlong;
-	dstlist = createListObject();
+        dstlist = createListObject();
         while (p) {
             ziplistGet(p,&vstr,&vlen,&vlong);
             if (vstr) {
-		tmp=createStringObject((char*)vstr,vlen);
+                tmp=createStringObject((char*)vstr,vlen);
             } else {
                 tmp=createStringObjectFromLongLong(vlong);
             }
-	    if (!dictFind(tdict, tmp)) {
-	        listTypePush(dstlist, tmp, insert);
-	        if (dictAdd(tdict, tmp, NULL)!=DICT_OK) {
-		    redisPanic("Cannot insert object into dict!");
-		}
-		incrRefCount(tmp); /* dict */
-	    }
-	    else {
-	        decrRefCount(tmp); /* release tmp */
-	    }
+            if (!dictFind(tdict, tmp)) {
+                listTypePush(dstlist, tmp, insert);
+                if (dictAdd(tdict, tmp, NULL)!=DICT_OK) {
+                    redisPanic("Cannot insert object into dict!");
+                }
+                incrRefCount(tmp); /* dict */
+            }
+            else {
+                decrRefCount(tmp); /* release tmp */
+            }
             p = (forward ? ziplistNext(src->ptr, p) : ziplistPrev(src->ptr, p));
         }
-	dictRelease(tdict);
+        dictRelease(tdict);
     }
     else {
-	redisPanic("List encoding is not LINKEDLIST nor ZIPLIST!");
+        redisPanic("List encoding is not LINKEDLIST nor ZIPLIST!");
     }
     if (save) {
         dbDelete(c->db,save);
-	if (listTypeLength(dstlist) > 0) {
-	    dbAdd(c->db,save,dstlist);
-	    addReplyLongLong(c,listTypeLength(dstlist));
-	} else {
-	    decrRefCount(dstlist);
-	    addReply(c,shared.czero);
-	}
-	signalModifiedKey(c->db,save);
-	server.dirty++;
+        if (listTypeLength(dstlist) > 0) {
+            dbAdd(c->db,save,dstlist);
+            addReplyLongLong(c,listTypeLength(dstlist));
+        } else {
+            decrRefCount(dstlist);
+            addReply(c,shared.czero);
+        }
+        signalModifiedKey(c->db,save);
+        server.dirty++;
     }
     else {
         if (listTypeLength(dstlist) > 0) {
-	    /* Return the result in form of a multi-bulk reply */
-	    addReplyMultiBulkLen(c,listTypeLength(dstlist));
-	    listIter* it;
-	    listNode* node;
-	    it = listGetIterator(dstlist->ptr, AL_START_HEAD);
-	    while ((node=listNext(it))!=NULL) {
-	        addReplyBulk(c,node->value);
-	    }
-	    listReleaseIterator(it);
-	}
-	else {
-	  addReply(c, shared.nullbulk);
-	}
-	decrRefCount(dstlist);
+            /* Return the result in form of a multi-bulk reply */
+            addReplyMultiBulkLen(c,listTypeLength(dstlist));
+            listIter* it;
+            listNode* node;
+            it = listGetIterator(dstlist->ptr, AL_START_HEAD);
+            while ((node=listNext(it))!=NULL) {
+                addReplyBulk(c,node->value);
+            }
+            listReleaseIterator(it);
+        }
+        else {
+            addReply(c, shared.nullbulk);
+        }
+        decrRefCount(dstlist);
     }
 }
 
@@ -167,36 +167,36 @@ void lforeachsstoreCommand(redisClient *c) {
     redisPattern pattern;
 
     if ((list=lookupKeyReadOrReply(c,c->argv[2],shared.nullbulk))==NULL ||
-	checkType(c,list,REDIS_LIST) || checkType(c,c->argv[3],REDIS_STRING))
-	return;
+        checkType(c,list,REDIS_LIST) || checkType(c,c->argv[3],REDIS_STRING))
+        return;
 
     if (initPattern(&pattern, c->argv[3])!=REDIS_OK) {
-	addReply(c,shared.czero);
-	releasePattern(&pattern);
-	return;
+        addReply(c,shared.czero);
+        releasePattern(&pattern);
+        return;
     }
 
     dstlist = createZiplistObject();
 
     li=listTypeInitIterator(list,0,REDIS_TAIL);
     while (listTypeNext(li,&entry)) {
-	obj=listTypeGet(&entry);
-	sobj = lookupKeyByPatternS(c->db, &pattern, obj, 0);
-	if (sobj) {
-	    if (sobj->type==REDIS_SET) {
-		si=setTypeInitIterator(sobj);
-		while ((tmp=setTypeNextObject(si))!=NULL) {
-		    listTypePush(dstlist, tmp, REDIS_TAIL);
-		    decrRefCount(tmp);
+        obj=listTypeGet(&entry);
+        sobj = lookupKeyByPatternS(c->db, &pattern, obj, 0);
+        if (sobj) {
+            if (sobj->type==REDIS_SET) {
+                si=setTypeInitIterator(sobj);
+                while ((tmp=setTypeNextObject(si))!=NULL) {
+                    listTypePush(dstlist, tmp, REDIS_TAIL);
+                    decrRefCount(tmp);
+                }
+                setTypeReleaseIterator(si);
+            }
+            else if (sobj->type==REDIS_STRING) {
+                listTypePush(dstlist, sobj, REDIS_TAIL);
+            }
+			decrRefCount(sobj);
 		}
-		setTypeReleaseIterator(si);
-	    }
-	    else if (sobj->type==REDIS_STRING) {
-		listTypePush(dstlist, sobj, REDIS_TAIL);
-	    }
-	}
-	decrRefCount(sobj);
-	decrRefCount(obj);
+        decrRefCount(obj);
     }
     listTypeReleaseIterator(li);
     releasePattern(&pattern);
@@ -204,11 +204,11 @@ void lforeachsstoreCommand(redisClient *c) {
     dbDelete(c->db, c->argv[1]);
     
     if (listTypeLength(dstlist) > 0) {
-	dbAdd(c->db,c->argv[1],dstlist);
-	addReplyLongLong(c,listTypeLength(dstlist));
+        dbAdd(c->db,c->argv[1],dstlist);
+        addReplyLongLong(c,listTypeLength(dstlist));
     } else {
-	decrRefCount(dstlist);
-	addReply(c,shared.czero);
+        decrRefCount(dstlist);
+        addReply(c,shared.czero);
     }
 
     signalModifiedKey(c->db,c->argv[1]);
@@ -225,37 +225,37 @@ void sforeachsstoreCommand(redisClient *c) {
     setTypeIterator *it, *it2;
 
     if ((set=lookupKeyReadOrReply(c,c->argv[2],shared.nullbulk))==NULL ||
-	checkType(c,set,REDIS_SET) || checkType(c,c->argv[3],REDIS_STRING))
-	return;
+        checkType(c,set,REDIS_SET) || checkType(c,c->argv[3],REDIS_STRING))
+        return;
 
     redisPattern pattern;
 
     if (initPattern(&pattern,c->argv[3])!=REDIS_OK) {
-	addReply(c,shared.czero);
-	releasePattern(&pattern);
-	return;
+        addReply(c,shared.czero);
+        releasePattern(&pattern);
+        return;
     }
-	
+    
     dstset = createIntsetObject();
 
     it=setTypeInitIterator(set);
     while ((obj=setTypeNextObject(it))!=NULL) {
-	sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
-	if (sobj) {
-	    if (sobj->type==REDIS_SET) {
-		it2=setTypeInitIterator(sobj);
-		while ((tmp=setTypeNextObject(it2))!=NULL) {
-		    setTypeAdd(dstset, tmp);
-		    decrRefCount(tmp);
-		}
-		setTypeReleaseIterator(it2);
-	    }
-	    else if (sobj->type==REDIS_STRING) {
-		setTypeAdd(dstset, sobj);
-	    }
-	    decrRefCount(sobj);
-	}
-	decrRefCount(obj);
+        sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
+        if (sobj) {
+            if (sobj->type==REDIS_SET) {
+                it2=setTypeInitIterator(sobj);
+                while ((tmp=setTypeNextObject(it2))!=NULL) {
+                    setTypeAdd(dstset, tmp);
+                    decrRefCount(tmp);
+                }
+                setTypeReleaseIterator(it2);
+            }
+            else if (sobj->type==REDIS_STRING) {
+                setTypeAdd(dstset, sobj);
+            }
+            decrRefCount(sobj);
+        }
+        decrRefCount(obj);
     }
     setTypeReleaseIterator(it);
 
@@ -264,11 +264,11 @@ void sforeachsstoreCommand(redisClient *c) {
     dbDelete(c->db, c->argv[1]);
     
     if (setTypeSize(dstset) > 0) {
-	dbAdd(c->db,c->argv[1],dstset);
-	addReplyLongLong(c,setTypeSize(dstset));
+        dbAdd(c->db,c->argv[1],dstset);
+        addReplyLongLong(c,setTypeSize(dstset));
     } else {
-	decrRefCount(dstset);
-	addReply(c,shared.czero);
+        decrRefCount(dstset);
+        addReply(c,shared.czero);
     }
 
     signalModifiedKey(c->db,c->argv[1]);
@@ -310,71 +310,71 @@ void zrangeByScoreAndMemberGeneric(redisClient *c, robj* save) {
     argv[5] = tryObjectEncoding(argv[5]); /* key2 */
 
     if (save)
-	dbDelete(c->db,save);
+        dbDelete(c->db,save);
 
     x = zsl->header;
     for (i = zsl->level-1; i >= 0; --i) {
-	while (x->level[i].forward &&
-	       ((range.minex ?
-		 x->level[i].forward->score <= range.min :
-		 x->level[i].forward->score < range.min) || 
-		((range.minex ?
-		  x->level[i].forward->score > range.min :
-		  x->level[i].forward->score >= range.min) &&
-		 compareStringObjects(x->level[i].forward->obj,argv[4]) < 0)))
-	    x = x->level[i].forward;
+        while (x->level[i].forward &&
+               ((range.minex ?
+                 x->level[i].forward->score <= range.min :
+                 x->level[i].forward->score < range.min) || 
+                ((range.minex ?
+                  x->level[i].forward->score > range.min :
+                  x->level[i].forward->score >= range.min) &&
+                 compareStringObjects(x->level[i].forward->obj,argv[4]) < 0)))
+            x = x->level[i].forward;
     }
 
     if (x->level[0].forward &&
-	(x->level[0].forward->score < range.max || 
-	 (!range.maxex && x->level[0].forward->score == range.max &&
-	  compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0))) {
+        (x->level[0].forward->score < range.max || 
+         (!range.maxex && x->level[0].forward->score == range.max &&
+          compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0))) {
       
-	x=x->level[0].forward;
-	first = x;
-	++listsize;
+        x=x->level[0].forward;
+        first = x;
+        ++listsize;
 
-	while (x->level[0].forward &&
-	       (x->level[0].forward->score < range.max ||
-		(!range.maxex && x->level[0].forward->score == range.max &&
-		 compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0))) {
-	    x = x->level[0].forward;
-	    ++listsize;
-	}
+        while (x->level[0].forward &&
+               (x->level[0].forward->score < range.max ||
+                (!range.maxex && x->level[0].forward->score == range.max &&
+                 compareStringObjects(x->level[0].forward->obj,argv[5]) <= 0))) {
+            x = x->level[0].forward;
+            ++listsize;
+        }
       
-	if (x) 
-	    x=x->level[0].forward;
+        if (x) 
+            x=x->level[0].forward;
       
-	if (save) {
-	    dstl = createZiplistObject();
-	    while (first!=x) {
-		listTypePush(dstl,first->obj, REDIS_TAIL);
-		first=first->level[0].forward;
-	    }
+        if (save) {
+            dstl = createZiplistObject();
+            while (first!=x) {
+                listTypePush(dstl,first->obj, REDIS_TAIL);
+                first=first->level[0].forward;
+            }
 
-	    dbAdd(c->db,save,dstl);
-	    addReplyLongLong(c,listsize);
-	    
-	    signalModifiedKey(c->db,save);
-	    server.dirty++;
-	}
-	else {
-	    /* Return the result in form of a multi-bulk reply */
-	    addReplyMultiBulkLen(c,listsize);
+            dbAdd(c->db,save,dstl);
+            addReplyLongLong(c,listsize);
+        
+            signalModifiedKey(c->db,save);
+            server.dirty++;
+        }
+        else {
+            /* Return the result in form of a multi-bulk reply */
+            addReplyMultiBulkLen(c,listsize);
 
-	    while (first!=x) {
-		addReplyBulk(c,first->obj);
-		first=first->level[0].forward;
-	    }
-	}
+            while (first!=x) {
+                addReplyBulk(c,first->obj);
+                first=first->level[0].forward;
+            }
+        }
     }
     else {
-	if (save) {
-	    addReply(c,shared.czero);
-	}
-	else {
-	    addReply(c,shared.nullbulk);
-	}
+        if (save) {
+            addReply(c,shared.czero);
+        }
+        else {
+            addReply(c,shared.nullbulk);
+        }
     }
 }
 
@@ -393,16 +393,16 @@ void zrangebyscorenmemberstoreCommand(redisClient *c) {
 //
 
 void groupsortstore(redisClient *c,
-		    robj *dst, robj *key, robj *keypat, robj *sortpat,
-		    int limit_start, int limit_count,
-		    int desc, int alpha)
+                    robj *dst, robj *key, robj *keypat, robj *sortpat,
+                    int limit_start, int limit_count,
+                    int desc, int alpha)
 {
     robj *list, *dstlist, *obj;
 
     if ((list=lookupKeyReadOrReply(c,key,shared.nullbulk))==NULL ||
-	checkType(c,list,REDIS_LIST) ||
-	checkType(c,keypat,REDIS_STRING) || checkType(c,sortpat,REDIS_STRING))
-	return;
+        checkType(c,list,REDIS_LIST) ||
+        checkType(c,keypat,REDIS_STRING) || checkType(c,sortpat,REDIS_STRING))
+        return;
 
     redisPattern pattern, sortby; pattern.pt=NULL; sortby.pt=NULL;
     int dontsort=0;
@@ -417,35 +417,35 @@ void groupsortstore(redisClient *c,
     listTypeEntry entry;
 
     while (listTypeNext(li,&entry)) {
-	obj=listTypeGet(&entry);
-	robj *sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
-	if (sobj) {
-	    if (sobj->type==REDIS_SET ||
-		sobj->type==REDIS_ZSET || sobj->type==REDIS_LIST) {
+        obj=listTypeGet(&entry);
+        robj *sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
+        if (sobj) {
+            if (sobj->type==REDIS_SET ||
+                sobj->type==REDIS_ZSET || sobj->type==REDIS_LIST) {
 
-		/* SORT sobj BY sortpat LIMIT 0 limit (start,count) GET # alpha desc */
-		int start = limit_start;
-		int end = limit_count;
-		int vectorlen = 0;
-		redisSortObject* vector=sortVectorEx(c, sobj, desc, alpha, &start, &end, dontsort, &sortby, &vectorlen);
-		for (int j = start; j <= end; ++j) {
-		    listTypePush(dstlist,vector[j].obj,REDIS_TAIL);
-		}
-		/* release redisSortObject */
-		if (sobj->type==REDIS_LIST || sobj->type==REDIS_SET) {
-		    for (int j = 0; j<vectorlen; ++j)
-			decrRefCount(vector[j].obj);
-		}
-		if (alpha) {
-		    for (int j = 0; j<vectorlen; ++j) 
-			if (vector[j].u.cmpobj)
-			    decrRefCount(vector[j].u.cmpobj);
-		}
-		zfree(vector);
-	    }
-	    decrRefCount(sobj);
-	}
-	decrRefCount(obj);
+                /* SORT sobj BY sortpat LIMIT 0 limit (start,count) GET # alpha desc */
+                int start = limit_start;
+                int end = limit_count;
+                int vectorlen = 0;
+                redisSortObject* vector=sortVectorEx(c, sobj, desc, alpha, &start, &end, dontsort, &sortby, &vectorlen);
+                for (int j = start; j <= end; ++j) {
+                    listTypePush(dstlist,vector[j].obj,REDIS_TAIL);
+                }
+                /* release redisSortObject */
+                if (sobj->type==REDIS_LIST || sobj->type==REDIS_SET) {
+                    for (int j = 0; j<vectorlen; ++j)
+                        decrRefCount(vector[j].obj);
+                }
+                if (alpha) {
+                    for (int j = 0; j<vectorlen; ++j) 
+                        if (vector[j].u.cmpobj)
+                            decrRefCount(vector[j].u.cmpobj);
+                }
+                zfree(vector);
+            }
+            decrRefCount(sobj);
+        }
+        decrRefCount(obj);
     }
     listTypeReleaseIterator(li);
     releasePattern(&sortby);
@@ -454,11 +454,11 @@ void groupsortstore(redisClient *c,
     dbDelete(c->db, dst);
     
     if (listTypeLength(dstlist) > 0) {
-	dbAdd(c->db,dst,dstlist);
-	addReplyLongLong(c,listTypeLength(dstlist));
+        dbAdd(c->db,dst,dstlist);
+        addReplyLongLong(c,listTypeLength(dstlist));
     } else {
-	decrRefCount(dstlist);
-	addReply(c,shared.czero);
+        decrRefCount(dstlist);
+        addReply(c,shared.czero);
     }
 
     signalModifiedKey(c->db,dst);
@@ -468,25 +468,25 @@ void groupsortstore(redisClient *c,
 /* GROUPSORT dst-list key-list key-pattern sort-pattern limit_min limit_count [ASC|DESC] [ALPHA] */
 void groupsortCommand(redisClient *c) {
     if (c->argc>9) {
-	addReplyError(c,"wrong number of arguments for GROUPSORT");
-	return;
+        addReplyError(c,"wrong number of arguments for GROUPSORT");
+        return;
     }
     int desc=0, alpha=0;
     int limit_start = atoi(c->argv[5]->ptr);
     int limit_count = atoi(c->argv[6]->ptr);
     if (c->argc>7) {
-	if (!strcasecmp(c->argv[c->argc-1]->ptr,"alpha"))
-	    alpha=1;
-	if (c->argc==9 && alpha==0) {
-	    addReplyErrorFormat(c,"wrong argument '%s' for GROUPSORT command",(char*)(c->argv[8]->ptr));
-	    return;
-	}
-	if (!strcasecmp(c->argv[7]->ptr,"desc")) {
-	    desc=1;
-	} else if (alpha==0 && strcasecmp(c->argv[7]->ptr,"asc")) {
-	    addReplyErrorFormat(c,"wrong argument '%s' for GROUPSORT command",(char*)(c->argv[7]->ptr));
-	    return;
-	}
+        if (!strcasecmp(c->argv[c->argc-1]->ptr,"alpha"))
+            alpha=1;
+        if (c->argc==9 && alpha==0) {
+            addReplyErrorFormat(c,"wrong argument '%s' for GROUPSORT command",(char*)(c->argv[8]->ptr));
+            return;
+        }
+        if (!strcasecmp(c->argv[7]->ptr,"desc")) {
+            desc=1;
+        } else if (alpha==0 && strcasecmp(c->argv[7]->ptr,"asc")) {
+            addReplyErrorFormat(c,"wrong argument '%s' for GROUPSORT command",(char*)(c->argv[7]->ptr));
+            return;
+        }
     }
     groupsortstore(c, c->argv[1], c->argv[2], c->argv[3], c->argv[4], limit_start, limit_count, desc, alpha);
 }
@@ -495,8 +495,8 @@ void groupsortCommand(redisClient *c) {
 void groupsumCommand(redisClient *c) {
     robj *src;
     if ((src=lookupKeyReadOrReply(c,c->argv[2],shared.nullbulk))==NULL ||
-	checkType(c,src,REDIS_LIST) || checkType(c,c->argv[3],REDIS_STRING))
-	return;
+        checkType(c,src,REDIS_LIST) || checkType(c,c->argv[3],REDIS_STRING))
+        return;
 
     robj *dst=createZiplistObject();
 
@@ -510,7 +510,7 @@ void groupsumCommand(redisClient *c) {
     redisPattern *ptn = zmalloc(sizeof(redisPattern)*nptn);
 
     for (int i=0; i<nptn; ++i)
-	initPattern(&(ptn[i]), c->argv[4+i]);
+        initPattern(&(ptn[i]), c->argv[4+i]);
 
     listTypeIterator *li=listTypeInitIterator(src,0,REDIS_TAIL);
     listTypeEntry entry;
@@ -520,45 +520,46 @@ void groupsumCommand(redisClient *c) {
     long long *accu = zmalloc(sizeof(long long)*nptn);
 
     while (listTypeNext(li,&entry)) {
-	obj=listTypeGet(&entry);
-	sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
-	memset(accu, 0, sizeof(long long)*nptn);
-	if (sobj) {
-	    switch (sobj->type) {
-	    case REDIS_SET : {
-		it=setTypeInitIterator(sobj);
-		while ((tmp=setTypeNextObject(it))!=NULL) {
-		    for (int i=0; i<nptn; ++i) {
-			robj *sumobj=lookupKeyByPatternS(c->db, &(ptn[i]), tmp, 1);
-			if (sumobj) {
-			    long long value;
-			    if (getLongLongFromObject(sumobj, &value)==REDIS_OK)
-				accu[i]+=value;
-			    decrRefCount(sumobj);
-			}
-		    }
-		    decrRefCount(tmp);
-		}
-		setTypeReleaseIterator(it);
-	    }
-	    default:
-		break;
-	    }
-	    decrRefCount(sobj);
-	}
-	decrRefCount(obj);
-	for (int i=0; i<nptn; ++i) {
-	    tmp=createStringObjectFromLongLong(accu[i]);
-	    listTypePush(dst, tmp, REDIS_TAIL);
-	    decrRefCount(tmp);
-	}
+        obj=listTypeGet(&entry);
+        sobj=lookupKeyByPatternS(c->db, &pattern, obj, 0);
+        memset(accu, 0, sizeof(long long)*nptn);
+        if (sobj) {
+            switch (sobj->type) {
+            case REDIS_SET : {
+                it=setTypeInitIterator(sobj);
+                while ((tmp=setTypeNextObject(it))!=NULL) {
+                    for (int i=0; i<nptn; ++i) {
+                        robj *sumobj=lookupKeyByPatternS(c->db, &(ptn[i]), tmp, 1);
+                        if (sumobj) {
+                            long long value;
+                            if (getLongLongFromObject(sumobj, &value)==REDIS_OK)
+                                accu[i]+=value;
+                            decrRefCount(sumobj);
+                        }
+                    }
+                    decrRefCount(tmp);
+                }
+                setTypeReleaseIterator(it);
+				break;
+            }
+            default:
+                break;
+            }
+            decrRefCount(sobj);
+        }
+        decrRefCount(obj);
+        for (int i=0; i<nptn; ++i) {
+            tmp=createStringObjectFromLongLong(accu[i]);
+            listTypePush(dst, tmp, REDIS_TAIL);
+            decrRefCount(tmp);
+        }
     }
     listTypeReleaseIterator(li);
 
     zfree(accu);
 
     for (int i=0; i<nptn; ++i)
-	releasePattern(&(ptn[i]));
+        releasePattern(&(ptn[i]));
 
     zfree(ptn);
 
@@ -567,11 +568,11 @@ void groupsumCommand(redisClient *c) {
     dbDelete(c->db, c->argv[1]);
     
     if (listTypeLength(dst) > 0) {
-	dbAdd(c->db,c->argv[1],dst);
-	addReplyLongLong(c,listTypeLength(dst));
+        dbAdd(c->db,c->argv[1],dst);
+        addReplyLongLong(c,listTypeLength(dst));
     } else {
-	decrRefCount(dst);
-	addReply(c,shared.czero);
+        decrRefCount(dst);
+        addReply(c,shared.czero);
     }
 
     signalModifiedKey(c->db,c->argv[1]);
@@ -581,27 +582,27 @@ void groupsumCommand(redisClient *c) {
 
 /*
   types of pattern:
-   1. "#" or "" -> direct subst with a subst key
-   2. "'string' with '*'" -> subst '*' with a key and look it up
-   3. "'string' with '->'" -> add a key and look ip up in a hash 'string'
+  1. "#" or "" -> direct subst with a subst key
+  2. "'string' with '*'" -> subst '*' with a key and look it up
+  3. "'string' with '->'" -> add a key and look ip up in a hash 'string'
 
-   p1 == p1 == -1 -> 1.
-   p1 >=0         -> 2. p1 - location of a '*'
-   p2 >=0         -> 3. p2 - first char after '->'
+  p1 == p1 == -1 -> 1.
+  p1 >=0         -> 2. p1 - location of a '*'
+  p2 >=0         -> 3. p2 - first char after '->'
 
-   could be either
-   1. prefix*postfix->field
-   2. keyname->prefix*postfix
+  could be either
+  1. prefix*postfix->field
+  2. keyname->prefix*postfix
 
-        0     !-p1    !-p2   !-plen
-    1. 'prefix*postfix->field' 
-        0      !-p2    !-p1    !-peln
-    2. 'keyname->prefix*postfix'
-        0  !-p1
-    3. 'key*name'   p2=-1
+  0     !-p1    !-p2   !-plen
+  1. 'prefix*postfix->field' 
+  0      !-p2    !-p1    !-peln
+  2. 'keyname->prefix*postfix'
+  0  !-p1
+  3. 'key*name'   p2=-1
    
-      p1 - position of '*'
-      p2 - position of '->'  - could be -1 - no hash
+  p1 - position of '*'
+  p2 - position of '->'  - could be -1 - no hash
 */
 
 int initPattern(redisPattern *p, robj *str) {
@@ -610,18 +611,18 @@ int initPattern(redisPattern *p, robj *str) {
     p->pt=getDecodedObject(str);
     sds spat=p->pt->ptr;
     if (spat[0]=='#' && spat[1] == '\0') {
-	return REDIS_OK;
+        return REDIS_OK;
     }
     char *ss=strchr(spat,'*');
     if (!ss) {
-	p->p2=0;
-	return REDIS_ERR;
+        p->p2=0;
+        return REDIS_ERR;
     }
     p->p1=ss-spat;
     
     char *ha=strstr(spat,"->");
     if (ha) {
-	p->p2=ha-spat;
+        p->p2=ha-spat;
     }
     redisLog(REDIS_DEBUG, "pattern init '%s' [%d,%d]", p->pt->ptr, p->p1, p->p2);
     return REDIS_OK;
@@ -629,8 +630,8 @@ int initPattern(redisPattern *p, robj *str) {
 
 void releasePattern(redisPattern *p) {
     if (p->pt) {
-	decrRefCount(p->pt);
-	p->pt=NULL;
+        decrRefCount(p->pt);
+        p->pt=NULL;
     }
     p->p1=-1;
     p->p2=-1;
@@ -642,7 +643,7 @@ robj *lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst, int stringO
         return subst;
     }
     if (p->p1==-1 || p->pt==NULL) /* there is no '*' in the p */
-	return NULL;
+        return NULL;
 
     subst = getDecodedObject(subst);    
 
@@ -662,25 +663,25 @@ robj *lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst, int stringO
     int postfix=plen-p->p1-1;
 
     if (p->p2==-1) { /* no '->' */
-	fieldname.len=0;
-	keyname.len=plen+slen-1;
+        fieldname.len=0;
+        keyname.len=plen+slen-1;
     }
     else {
-	if (p->p2>=0 && p->p2<p->p1) {
-	    keyname.len = p->p2;
-	    memcpy(keyname.buf,((char*)(p->pt->ptr)),keyname.len);
-	    pD = fieldname.buf;
-	    pS += p->p2+2;
-	    prefix -= p->p2+2;
-	    fieldname.len = postfix + prefix + slen;
-	}
-	else {
-	    postfix=p->p2-p->p1-1;
-	    fieldname.len = plen-p->p2-2;
-	    /* copy '\0' */
-	    memcpy(fieldname.buf,((char*)(p->pt->ptr))+p->p2+2,fieldname.len+1);
-	    keyname.len = postfix + prefix + slen;
-	}
+        if (p->p2>=0 && p->p2<p->p1) {
+            keyname.len = p->p2;
+            memcpy(keyname.buf,((char*)(p->pt->ptr)),keyname.len);
+            pD = fieldname.buf;
+            pS += p->p2+2;
+            prefix -= p->p2+2;
+            fieldname.len = postfix + prefix + slen;
+        }
+        else {
+            postfix=p->p2-p->p1-1;
+            fieldname.len = plen-p->p2-2;
+            /* copy '\0' */
+            memcpy(fieldname.buf,((char*)(p->pt->ptr))+p->p2+2,fieldname.len+1);
+            keyname.len = postfix + prefix + slen;
+        }
     }
 
     memcpy(pD, pS, prefix);
@@ -696,12 +697,12 @@ robj *lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst, int stringO
 
 #if 0
     if (fieldname.len > 0) {
-	redisLog(REDIS_DEBUG, " lookup ('%s'[%d,%d])('%s') -> '%s->%s'",
-		 p->pt->ptr, p->p1, p->p2, subst->ptr, keyname.buf, fieldname.buf);
+        redisLog(REDIS_DEBUG, " lookup ('%s'[%d,%d])('%s') -> '%s->%s'",
+                 p->pt->ptr, p->p1, p->p2, subst->ptr, keyname.buf, fieldname.buf);
     }
     else {
-	redisLog(REDIS_DEBUG, " lookup ('%s'[%d,%d])('%s') -> '%s'",
-		 p->pt->ptr, p->p1, p->p2, subst->ptr, keyname.buf);
+        redisLog(REDIS_DEBUG, " lookup ('%s'[%d,%d])('%s') -> '%s'",
+                 p->pt->ptr, p->p1, p->p2, subst->ptr, keyname.buf);
     }
 #endif
 
@@ -713,16 +714,16 @@ robj *lookupKeyByPatternS(redisDb *db, redisPattern *p, robj *subst, int stringO
         if (o->type != REDIS_HASH) return NULL;
         /* Retrieve value from hash by the field name. This operation
          * already increases the refcount of the returned object. */
-	robj fieldobj;
+        robj fieldobj;
         initStaticStringObject(fieldobj,((char*)&fieldname)+(sizeof(struct sdshdr)));
         o = hashTypeGetObject(o, &fieldobj);
     } else {
         /* Every object that this function returns needs to have its refcount
          * increased. sortCommand decreases it again. */
-	if (stringOnly && o->type!=REDIS_STRING) 
-	    return NULL;
-	else 
-	    incrRefCount(o);
+        if (stringOnly && o->type!=REDIS_STRING) 
+            return NULL;
+        else 
+            incrRefCount(o);
     }
     return o;
 }
