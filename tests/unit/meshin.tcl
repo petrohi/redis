@@ -134,27 +134,80 @@ start_server {
     }
 
     test {LFOREACHSSTORE} {
-	assert_equal 1 [r rpush lidx 1]
-	assert_equal 2 [r rpush lidx 2]
-	assert_equal 3 [r rpush lidx 3]
-	assert_equal 4 [r rpush lidx 4]
-	assert_equal 5 [r rpush lidx 5]
-	assert_equal 1 [r sadd set1val 1]
-	assert_equal 1 [r sadd set1val 2]
-	assert_equal 1 [r sadd set1val 3]
-	assert_equal 1 [r sadd set2val a3]
-	assert_equal 1 [r sadd set2val a2]
-	assert_equal 1 [r sadd set2val a1]
-	assert_equal 1 [r sadd set3val set3a1]
-	assert_equal 1 [r sadd set4val set4a1]
-	assert_equal 1 [r sadd set5val set5a1]
-	assert_equal 1 [r sadd set5val 1]
-	assert_equal 1 [r sadd set5val 2]
-	assert_equal 1 [r sadd set5val 3]
-	assert_equal 1 [r sadd set5val 4]
-	assert_equal 1 [r sadd set5val 5]
-	assert_equal 14 [r lforeachsstore ldst lidx set*val]
+		assert_equal 1 [r rpush lidx 1]
+		assert_equal 2 [r rpush lidx 2]
+		assert_equal 3 [r rpush lidx 3]
+		assert_equal 4 [r rpush lidx 4]
+		assert_equal 5 [r rpush lidx 5]
+		assert_equal 1 [r sadd set1val 1]
+		assert_equal 1 [r sadd set1val 2]
+		assert_equal 1 [r sadd set1val 3]
+		assert_equal 1 [r sadd set2val a3]
+		assert_equal 1 [r sadd set2val a2]
+		assert_equal 1 [r sadd set2val a1]
+		assert_equal 1 [r sadd set3val set3a1]
+		assert_equal 1 [r sadd set4val set4a1]
+		assert_equal 1 [r sadd set5val set5a1]
+		assert_equal 1 [r sadd set5val 1]
+		assert_equal 1 [r sadd set5val 2]
+		assert_equal 1 [r sadd set5val 3]
+		assert_equal 1 [r sadd set5val 4]
+		assert_equal 1 [r sadd set5val 5]
+		assert_equal 14 [r lforeachsstore ldst lidx set*val]
+	}
+	test {LFOREACHSSTORE hset} {
+		assert_equal 1 [r hset hs 1 a1]
+		assert_equal 1 [r hset hs 2 a2]
+		assert_equal 1 [r hset hs 3 a3]
+		assert_equal 1 [r hset hs 4 a5]
+		assert_equal 1 [r hset hs 5 a5]
+		assert_equal 0 [r lforeachsstore ldst lidx hset->*]
     }
+
+    test {LFOREACHSTORE wrong arguments} {
+		catch {r lforeachsstore ldst set1val set* } err
+		format $err
+    } {ERR*}
+
+    test {LFOREACHSTORE wrong # arguments} {
+		catch {r lforeachsstore ldst set1val } err
+		format $err
+    } {ERR*}
+
+    test {LFOREACHSTORE wrong # arguments} {
+		catch {r lforeachsstore ldst set1val set* sett* } err
+		format $err
+    } {ERR*}
+
+	test {LFOREACHSTORE wrong patterns} {
+		assert_equal {} [r lforeachsstore ldst lid set* ]
+		assert_equal 0 [r lforeachsstore ldst lidx set* ]
+	}
+
+	test {SFOREACHSSTORE wrong # params} {
+		catch {r sforeachsstore sdst set1val set* sett* } err
+		format $err
+    } {ERR*}
+
+	test {SFOREACHSSTORE wrong # params} {
+		catch {r sforeachsstore sdst set1val} err
+		format $err
+    } {ERR*}
+
+	test {SFOREACHSSTORE} {
+		assert_equal {} [r sforeachsstore sdst ldst keys* ]
+		assert_equal 1 [r sadd sidx 1]
+		assert_equal 1 [r sadd sidx 2]
+		assert_equal 1 [r sadd sidx 3]
+		assert_equal 1 [r sadd sidx 4]
+		assert_equal 1 [r sadd sidx 5]
+		assert_equal 0 [r sforeachsstore sdst sidx k* ]
+		assert_equal 11 [r sforeachsstore sdst sidx set*val ]
+    }
+
+	test {SFOREACHSSTORE hset} {
+		assert_equal 0 [r sforeachsstore sdst sidx hset->*]
+	}
 
     test {L2SSTORE - ziplist} {
 	assert_equal 1 [r lpush myziplist3 a]
@@ -175,7 +228,7 @@ start_server {
         assert_equal 3 [r rpush mylist3 c]
         assert_equal 4 [r lpush mylist3 d]
         assert_equal 5 [r lpush mylist3 c]
-	assert_equal 5 [r llen  mylist3]
+		assert_equal 5 [r llen  mylist3]
         assert_equal 4 [r l2sstore myset2 mylist3]
         assert_equal 4 [r scard myset2]
     }
@@ -200,7 +253,7 @@ start_server {
     }
 
     test "ZREVRANKORNEXT" {
-	# zrtmp { 1 2 3 4 a } [0-4]
+		# zrtmp { 1 2 3 4 a } [0-4]
         #       5 4 3 2 1 0
 	assert_equal 4 [r zrevrankornext zrtmp 1]
 	assert_equal 3 [r zrevrankornext zrtmp 2]
@@ -215,20 +268,122 @@ start_server {
 	assert_equal 3 [r zrevrankornext zrtmp 222]	
     }
 
-    test "ZRANGEBYSCORENMEMBER" {
-	# 0:{1 2 3 4 a} 1:{a1 a2 a3 a4}
-	assert_equal 1 [r zadd zrtmp 1 a1]
-	assert_equal 1 [r zadd zrtmp 1 a2]
-	assert_equal 1 [r zadd zrtmp 1 a3]
-	assert_equal 1 [r zadd zrtmp 1 a4]
-	assert_equal {1 2 3 4} [r zrangebyscorenmember zrtmp 0 0 1 4]
-	assert_equal {a1 a2 a3 a4} [r zrangebyscorenmember zrtmp 1 1 a f]
-	assert_equal {a a1 a2 a3 a4} [r zrangebyscorenmember zrtmp 0 1 a f]
-	assert_equal {1 2 3 4 a a1 a2 a3 a4} [r zrangebyscorenmember zrtmp 0 1 0 f]
-	assert_equal 1 [r zadd zrtmp 0.5 ff]
-	assert_equal {2 3 4 a ff} [r zrangebyscorenmember zrtmp 0 (1 2 f]
-	assert_equal {ff a1 a2 a3 a4} [r zrangebyscorenmember zrtmp (0 1 0 f]
-	assert_equal {ff} [r zrangebyscorenmember zrtmp (0 (1 0 f]
-    }
+    test {ZRANGESTORE wrong arguments} {
+		catch {r zrangestore ldst set1val 0 -1 } err
+		format $err
+    } {ERR*}
 
+	test "ZRANGESTORE" {
+		assert_equal 5 [r zrangestore ldst zrtmp 0 -1]
+		assert_equal {1 2 3 4 a} [r lrange ldst 0 -1]
+		assert_equal 4 [r zrangestore ldst zrtmp 1 -1]
+		assert_equal {2 3 4 a} [r lrange ldst 0 -1]
+		assert_equal 4 [r zrangestore ldst zrtmp 0 3]
+		assert_equal {1 2 3 4} [r lrange ldst 0 -1]
+	}
+
+    test {ZREVRANGESTORE wrong arguments} {
+		catch {r zrevrangestore ldst set1val 0 -1 } err
+		format $err
+    } {ERR*}
+
+	test "ZREVRANGESTORE" {
+		assert_equal 5 [r zrevrangestore ldst zrtmp 0 -1]
+		assert_equal {a 4 3 2 1} [r lrange ldst 0 -1]
+		assert_equal 4 [r zrevrangestore ldst zrtmp 1 -1]
+		assert_equal {4 3 2 1} [r lrange ldst 0 -1]
+		assert_equal 4 [r zrevrangestore ldst zrtmp 0 3]
+		assert_equal {a 4 3 2} [r lrange ldst 0 -1]
+	}
+
+    test {ZRANGEBYSCORESTORE wrong arguments} {
+		catch {r zrangebyscorestore ldst set1val 0 -1 } err
+		format $err
+    } {ERR*}
+
+	test "ZRANGEBYSCORESTORE" {
+		assert_equal {} [r zrangebyscorestore ldst zrtmp 1 1]
+		assert_equal 5 [r zrangebyscorestore ldst zrtmp 0 1]
+	}
+
+    test {ZREVRANGEBYSCORESTORE wrong arguments} {
+		catch {r zrevrangebyscorestore ldst set1val 0 -1 } err
+		format $err
+    } {ERR*}
+
+	test "ZREVRANGEBYSCORESTORE" {
+		assert_equal {} [r zrangebyscorestore ldst zrtmp 1 1]
+		assert_equal 5 [r zrangebyscorestore ldst zrtmp 0 1]
+	}
+
+    test {ZRANGEBYSCORENMEMBER wrong # of args} {
+		catch {r zrangebyscorenmember zrtmp 0 0 0 0 0} err
+		format $err
+    } {ERR*}
+
+    test {ZRANGEBYSCORENMEMBER wrong # of args} {
+		catch {r zrangebyscorenmember zrtmp 0 0 0 } err
+		format $err
+    } {ERR*}
+
+    test {ZRANGEBYSCORENMEMBER wrong type of args} {
+		catch {r zrangebyscorenmember set1val 0 1 0 f} err
+		format $err
+    } {ERR*}
+
+    test {ZRANGEBYSCORENMEMBER wrong type of args} {
+		catch {r zrangebyscorenmember zrtmp a b 0 f} err
+		format $err
+    } {ERR*}
+
+    test "ZRANGEBYSCORENMEMBER" {
+		# 0:{1 2 3 4 a} 1:{a1 a2 a3 a4}
+		assert_equal 1 [r zadd zrtmp 1 a1]
+		assert_equal 1 [r zadd zrtmp 1 a2]
+		assert_equal 1 [r zadd zrtmp 1 a3]
+		assert_equal 1 [r zadd zrtmp 1 a4]
+		assert_equal {1 2 3 4} [r zrangebyscorenmember zrtmp 0 0 1 4]
+		assert_equal {a1 a2 a3 a4} [r zrangebyscorenmember zrtmp 1 1 a f]
+		assert_equal {a a1 a2 a3 a4} [r zrangebyscorenmember zrtmp 0 1 a f]
+		assert_equal {1 2 3 4 a a1 a2 a3 a4} [r zrangebyscorenmember zrtmp 0 1 0 f]
+		assert_equal 1 [r zadd zrtmp 0.5 ff]
+		assert_equal {2 3 4 a ff} [r zrangebyscorenmember zrtmp 0 (1 2 f]
+		assert_equal {ff a1 a2 a3 a4} [r zrangebyscorenmember zrtmp (0 1 0 f]
+		assert_equal {ff} [r zrangebyscorenmember zrtmp (0 (1 0 f]
+	}
+
+    test {ZRANGEBYSCORENMEMBERSTORE wrong # of args} {
+		catch {r zrangebyscorenmemberstore ldst zrtmp 0 0 0 0 0} err
+		format $err
+    } {ERR*}
+
+    test {ZRANGEBYSCORENMEMBERSTORE wrong # of args} {
+		catch {r zrangebyscorenmemberstore ldst zrtmp 0 0 0 } err
+		format $err
+    } {ERR*}
+
+    test {ZRANGEBYSCORENMEMBERSTORE wrong type of args} {
+		catch {r zrangebyscorenmemberstore ldst set1val 0 0 0 0 } err
+		format $err
+    } {ERR*}
+
+    test {ZRANGEBYSCORENMEMBERSTORE wrong type of args} {
+		catch {r zrangebyscorenmemberstore ldst zrtmp a b 0 f} err
+		format $err
+    } {ERR*}
+
+    test "ZRANGEBYSCORENMEMBERSTORE" {
+		assert_equal 4 [r zrangebyscorenmemberstore ldst zrtmp 0 0 1 4]
+		assert_equal {1 2 3 4} [r lrange ldst 0 -1]
+		assert_equal 4 [r zrangebyscorenmemberstore ldst zrtmp 1 1 a f]
+		assert_equal {a1 a2 a3 a4} [r lrange ldst 0 -1]
+		assert_equal 10 [r zrangebyscorenmemberstore ldst zrtmp 0 1 0 f]
+		assert_equal {1 2 3 4 a ff a1 a2 a3 a4} [r lrange ldst 0 -1]
+		assert_equal 5 [r zrangebyscorenmemberstore ldst zrtmp 0 (1 2 f]
+		assert_equal {2 3 4 a ff} [r lrange ldst 0 -1]
+		assert_equal 5 [r zrangebyscorenmemberstore ldst zrtmp (0 1 0 f]
+		assert_equal {ff a1 a2 a3 a4} [r lrange ldst 0 -1]
+		assert_equal 1 [r zrangebyscorenmemberstore ldst zrtmp (0 (1 0 f]
+		assert_equal {ff} [r lrange ldst 0 -1]
+    }
 }
