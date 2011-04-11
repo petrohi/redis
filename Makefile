@@ -13,6 +13,9 @@ clean:
 	cd deps/hiredis && $(MAKE) $@
 	cd deps/linenoise && $(MAKE) $@
 
+deb:
+	dpkg-buildpackage -b -rfakeroot -tc -uc -D
+
 $(TARGETS):
 	cd src && $(MAKE) $@
 

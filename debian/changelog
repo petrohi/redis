@@ -1,3 +1,19 @@
+redis (2:2.2.4-meshin-0) stable; urgency=low
+
+  * Return value of OBJECT DEBUG against sorted sets fixed, now is "skiplist".
+
+ -- Maxim Bolotin <maxim@meshin.com>  Mon, 11 Apr 2011 10:00:01 +0800
+
+redis (2:2.2.3-meshin-0) stable; urgency=low
+
+  * Fixed issue #503. MONITOR + QUIT (and other combinations) could crash the server.
+  * OBJECT command implemented. See http://redis.io/commands/object
+  * Fixed a problem in redis-cli related to escapes in the form "\x..".
+  * Fixed a minor memory leak in redis-cli
+  * Saved RDB on SIGTERM on archs where it was not working properly.
+
+ -- Maxim Bolotin <maxim@meshin.com>  Mon, 11 Apr 2011 10:00:00 +0800
+
 redis (2:2.2.2-meshin-0) stable; urgency=low
 
   * redis 2.2.2 is a bugfix release.
