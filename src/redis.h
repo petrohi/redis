@@ -493,6 +493,7 @@ struct redisServer {
     /* Misc */
     unsigned lruclock:22;        /* clock incrementing every minute, for LRU */
     unsigned lruclock_padding:10;
+    sds tempkeyprefix;
 };
 
 typedef struct pubsubPattern {
@@ -1024,6 +1025,24 @@ void publishCommand(redisClient *c);
 void watchCommand(redisClient *c);
 void unwatchCommand(redisClient *c);
 void objectCommand(redisClient *c);
+
+inline
+int isTempKey(const robj* obj)
+{
+    return (server.tempkeyprefix && obj && obj->ptr && 
+            strncmp(server.tempkeyprefix, obj->ptr, sdslen(server.tempkeyprefix))==0);
+}
+
+inline
+void dirtyIfNotaTemp(redisDb *db, robj* obj)
+{
+// 2.2.x port, signalModifiedKey -> touchWatchedKey
+#define signalModifiedKey touchWatchedKey
+    if (!isTempKey(obj)) {
+        signalModifiedKey(db,obj); // unstable or master branch
+        server.dirty++;
+    }
+}
 
 #if defined(__GNUC__)
 void *calloc(size_t count, size_t size) __attribute__ ((deprecated));

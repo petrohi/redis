@@ -231,8 +231,7 @@ void saddCommand(redisClient *c) {
         }
     }
     if (setTypeAdd(set,c->argv[2])) {
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,c->argv[1]);
         addReply(c,shared.cone);
     } else {
         addReply(c,shared.czero);
@@ -247,9 +246,9 @@ void sremCommand(redisClient *c) {
 
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     if (setTypeRemove(set,c->argv[2])) {
-        if (setTypeSize(set) == 0) dbDelete(c->db,c->argv[1]);
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        if (setTypeSize(set) == 0)
+            dbDelete(c->db,c->argv[1]);
+        dirtyIfNotaTemp(c->db,c->argv[1]);
         addReply(c,shared.cone);
     } else {
         addReply(c,shared.czero);
@@ -287,9 +286,17 @@ void smoveCommand(redisClient *c) {
 
     /* Remove the src set from the database when empty */
     if (setTypeSize(srcset) == 0) dbDelete(c->db,c->argv[1]);
-    touchWatchedKey(c->db,c->argv[1]);
-    touchWatchedKey(c->db,c->argv[2]);
-    server.dirty++;
+    int sdirty=0;
+    if (!isTempKey(c->argv[1])) {
+        touchWatchedKey(c->db,c->argv[1]);
+        sdirty++;
+    }
+    if (!isTempKey(c->argv[1])) {
+        touchWatchedKey(c->db,c->argv[2]);
+        sdirty++;
+    }
+    if (sdirty>0) 
+        server.dirty++;
 
     /* Create the destination set when it doesn't exist */
     if (!dstset) {
@@ -298,7 +305,9 @@ void smoveCommand(redisClient *c) {
     }
 
     /* An extra key has changed when ele was successfully added to dstset */
-    if (setTypeAdd(dstset,ele)) server.dirty++;
+    if (setTypeAdd(dstset,ele)) {
+        if (!isTempKey(dstset)) server.dirty++;
+    } 
     addReply(c,shared.cone);
 }
 
@@ -354,8 +363,7 @@ void spopCommand(redisClient *c) {
 
     addReplyBulk(c,ele);
     if (setTypeSize(set) == 0) dbDelete(c->db,c->argv[1]);
-    touchWatchedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 void srandmemberCommand(redisClient *c) {
@@ -395,8 +403,7 @@ void sinterGenericCommand(redisClient *c, robj **setkeys, unsigned long setnum, 
             zfree(sets);
             if (dstkey) {
                 if (dbDelete(c->db,dstkey)) {
-                    touchWatchedKey(c->db,dstkey);
-                    server.dirty++;
+                    dirtyIfNotaTemp(c->db,dstkey);
                 }
                 addReply(c,shared.czero);
             } else {
@@ -499,8 +506,7 @@ void sinterGenericCommand(redisClient *c, robj **setkeys, unsigned long setnum, 
             decrRefCount(dstset);
             addReply(c,shared.czero);
         }
-        touchWatchedKey(c->db,dstkey);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,dstkey);
     } else {
         setDeferredMultiBulkLength(c,replylen,cardinality);
     }
@@ -591,8 +597,7 @@ void sunionDiffGenericCommand(redisClient *c, robj **setkeys, int setnum, robj *
             decrRefCount(dstset);
             addReply(c,shared.czero);
         }
-        touchWatchedKey(c->db,dstkey);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,dstkey);
     }
     zfree(sets);
 }

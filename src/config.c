@@ -189,7 +189,7 @@ void loadServerConfig(char *filename) {
             server.masterport = atoi(argv[2]);
             server.replstate = REDIS_REPL_CONNECT;
         } else if (!strcasecmp(argv[0],"masterauth") && argc == 2) {
-        	server.masterauth = zstrdup(argv[1]);
+            server.masterauth = zstrdup(argv[1]);
         } else if (!strcasecmp(argv[0],"slave-serve-stale-data") && argc == 2) {
             if ((server.repl_serve_stale_data = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
@@ -288,6 +288,8 @@ void loadServerConfig(char *filename) {
                     err = "Target command name already exists"; goto loaderr;
                 }
             }
+        } else if (!strcasecmp(argv[0], "tempkeyprefix") && argc == 2) {
+            server.tempkeyprefix = sdsdup(argv[1]);
         } else {
             err = "Bad directive or wrong number of arguments"; goto loaderr;
         }

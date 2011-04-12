@@ -397,8 +397,7 @@ void zaddGenericCommand(redisClient *c, robj *key, robj *ele, double score, int 
         de = dictFind(zs->dict,ele);
         redisAssert(de != NULL);
         dictGetEntryVal(de) = &znode->score;
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,c->argv[1]);
         if (incr)
             addReplyDouble(c,score);
         else
@@ -425,8 +424,7 @@ void zaddGenericCommand(redisClient *c, robj *key, robj *ele, double score, int 
 
             /* Update the score in the current dict entry */
             dictGetEntryVal(de) = &znode->score;
-            touchWatchedKey(c->db,c->argv[1]);
-            server.dirty++;
+            dirtyIfNotaTemp(c->db,c->argv[1]);
         }
         if (incr)
             addReplyDouble(c,score);
@@ -475,8 +473,7 @@ void zremCommand(redisClient *c) {
     dictDelete(zs->dict,c->argv[2]);
     if (htNeedsResize(zs->dict)) dictResize(zs->dict);
     if (dictSize(zs->dict) == 0) dbDelete(c->db,c->argv[1]);
-    touchWatchedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
     addReply(c,shared.cone);
 }
 
@@ -739,15 +736,19 @@ void zunionInterGenericCommand(redisClient *c, robj *dstkey, int op) {
     }
 
     if (dbDelete(c->db,dstkey)) {
-        touchWatchedKey(c->db,dstkey);
-        touched = 1;
-        server.dirty++;
+        if (!isTempKey(dstkey)) {
+            touchWatchedKey(c->db,dstkey);
+            touched = 1;
+            server.dirty++;
+        }
     }
     if (dstzset->zsl->length) {
         dbAdd(c->db,dstkey,dstobj);
         addReplyLongLong(c, dstzset->zsl->length);
-        if (!touched) touchWatchedKey(c->db,dstkey);
-        server.dirty++;
+        if (!isTempKey(dstkey)) {
+            if (!touched) touchWatchedKey(c->db,dstkey);
+            server.dirty++;
+        }
     } else {
         decrRefCount(dstobj);
         addReply(c, shared.czero);
@@ -1174,31 +1175,31 @@ void zrankGenericCommand(redisClient *c, int reverse, int exact) {
     de = dictFind(zs->dict,c->argv[2]);
 
     if (!de) {
-	if (exact) {
-	    addReply(c,shared.nullbulk);
-	    return;
-	}
-	rank = zslistTypeGetRankNext(zsl, c->argv[2]);
+        if (exact) {
+            addReply(c,shared.nullbulk);
+            return;
+        }
+        rank = zslistTypeGetRankNext(zsl, c->argv[2]);
 
-	if (reverse) {
-	    addReplyLongLong(c, zsl->length - rank);
-	} else {
-	    addReplyLongLong(c, rank);
-	}
+        if (reverse) {
+            addReplyLongLong(c, zsl->length - rank);
+        } else {
+            addReplyLongLong(c, rank);
+        }
     }
     else {
-	score = dictGetEntryVal(de);
-	rank = zslistTypeGetRank(zsl, *score, c->argv[2]);
+        score = dictGetEntryVal(de);
+        rank = zslistTypeGetRank(zsl, *score, c->argv[2]);
   
-	if (rank) {
-	    if (reverse) {
-		addReplyLongLong(c, zsl->length - rank);
-	    } else {
-		addReplyLongLong(c, rank-1);
-	    }
-	} else {
-	    addReply(c,shared.nullbulk);
-	}
+        if (rank) {
+            if (reverse) {
+                addReplyLongLong(c, zsl->length - rank);
+            } else {
+                addReplyLongLong(c, rank-1);
+            }
+        } else {
+            addReply(c,shared.nullbulk);
+        }
     }
 }
 

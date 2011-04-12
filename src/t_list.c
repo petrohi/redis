@@ -281,8 +281,7 @@ void pushGenericCommand(redisClient *c, int where) {
     }
     listTypePush(lobj,c->argv[2],where);
     addReplyLongLong(c,listTypeLength(lobj));
-    touchWatchedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 void lpushCommand(redisClient *c) {
@@ -330,8 +329,7 @@ void pushxGenericCommand(redisClient *c, robj *refval, robj *val, int where) {
             if (subject->encoding == REDIS_ENCODING_ZIPLIST &&
                 ziplistLen(subject->ptr) > server.list_max_ziplist_entries)
                     listTypeConvert(subject,REDIS_ENCODING_LINKEDLIST);
-            touchWatchedKey(c->db,c->argv[1]);
-            server.dirty++;
+            dirtyIfNotaTemp(c->db,c->argv[1]);
         } else {
             /* Notify client of a failed insert */
             addReply(c,shared.cnegone);
@@ -339,8 +337,7 @@ void pushxGenericCommand(redisClient *c, robj *refval, robj *val, int where) {
         }
     } else {
         listTypePush(subject,val,where);
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,c->argv[1]);
     }
 
     addReplyLongLong(c,listTypeLength(subject));
@@ -427,8 +424,7 @@ void lsetCommand(redisClient *c) {
             o->ptr = ziplistInsert(o->ptr,p,value->ptr,sdslen(value->ptr));
             decrRefCount(value);
             addReply(c,shared.ok);
-            touchWatchedKey(c->db,c->argv[1]);
-            server.dirty++;
+            dirtyIfNotaTemp(c->db,c->argv[1]);
         }
     } else if (o->encoding == REDIS_ENCODING_LINKEDLIST) {
         listNode *ln = listIndex(o->ptr,index);
@@ -439,8 +435,7 @@ void lsetCommand(redisClient *c) {
             listNodeValue(ln) = value;
             incrRefCount(value);
             addReply(c,shared.ok);
-            touchWatchedKey(c->db,c->argv[1]);
-            server.dirty++;
+            dirtyIfNotaTemp(c->db,c->argv[1]);
         }
     } else {
         redisPanic("Unknown list encoding");
@@ -458,8 +453,7 @@ void popGenericCommand(redisClient *c, int where) {
         addReplyBulk(c,value);
         decrRefCount(value);
         if (listTypeLength(o) == 0) dbDelete(c->db,c->argv[1]);
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,c->argv[1]);
     }
 }
 
@@ -573,14 +567,14 @@ void ltrimCommand(redisClient *c) {
         redisPanic("Unknown list encoding");
     }
     if (listTypeLength(o) == 0) dbDelete(c->db,c->argv[1]);
-    touchWatchedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
     addReply(c,shared.ok);
 }
 
 void lremCommand(redisClient *c) {
     robj *subject, *obj;
     obj = c->argv[3] = tryObjectEncoding(c->argv[3]);
+    int temp = isTempKey(c->argv[1]);
     int toremove = atoi(c->argv[2]->ptr);
     int removed = 0;
     listTypeEntry entry;
@@ -603,7 +597,7 @@ void lremCommand(redisClient *c) {
     while (listTypeNext(li,&entry)) {
         if (listTypeEqual(&entry,obj)) {
             listTypeDelete(&entry);
-            server.dirty++;
+            if (!temp) server.dirty++;
             removed++;
             if (toremove && removed == toremove) break;
         }
@@ -616,7 +610,7 @@ void lremCommand(redisClient *c) {
 
     if (listTypeLength(subject) == 0) dbDelete(c->db,c->argv[1]);
     addReplyLongLong(c,removed);
-    if (removed) touchWatchedKey(c->db,c->argv[1]);
+    if (removed && !temp) touchWatchedKey(c->db,c->argv[1]);
 }
 
 /* This is the semantic of this command:
@@ -642,8 +636,7 @@ void rpoplpushHandlePush(redisClient *c, robj *dstkey, robj *dstobj, robj *value
             dstobj = createZiplistObject();
             dbAdd(c->db,dstkey,dstobj);
         } else {
-            touchWatchedKey(c->db,dstkey);
-            server.dirty++;
+            dirtyIfNotaTemp(c->db,c->argv[1]);
         }
         listTypePush(dstobj,value,REDIS_HEAD);
     }
@@ -669,9 +662,9 @@ void rpoplpushCommand(redisClient *c) {
         decrRefCount(value);
 
         /* Delete the source list when it is empty */
-        if (listTypeLength(sobj) == 0) dbDelete(c->db,c->argv[1]);
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        if (listTypeLength(sobj) == 0)
+            dbDelete(c->db,c->argv[1]);
+        dirtyIfNotaTemp(c->db,c->argv[1]);
     }
 }
 

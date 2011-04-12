@@ -3,8 +3,8 @@
 
 extern
 redisSortObject* sortVectorEx(redisClient *c, robj *sortval,
-							  int desc, int alpha, int *lstart, int *lcount,
-							  int dontsort, redisPattern* sortby, int *lvector);
+                              int desc, int alpha, int *lstart, int *lcount,
+                              int dontsort, redisPattern* sortby, int *lvector);
 
 
 //
@@ -15,16 +15,33 @@ redisSortObject* sortVectorEx(redisClient *c, robj *sortval,
 //  LIST commands
 //
 
-// 2.2.x port, signalModifiedKey -> touchWatchedKey
-#define signalModifiedKey touchWatchedKey
+#if 0
+int isTempKey(const robj* object)
+{
+    int result=0; // false
+    if (server.tempkeyprefix && object && object->ptr) {
+        result =(strncmp(server.tempkeyprefix, object->ptr, sdslen(server.tempkeyprefix))==0);
+        redisLog(REDIS_DEBUG, "%s %s a temp key", object->ptr, (result ? "is" : "is not"));
+    }
+    return result;
+}
 
-//  L2SSTORE destination key
+void dirtyIfNotaTemp(redisDb *db, robj* obj)
+{
+    if (!isTempKey(obj)) {
+        signalModifiedKey(db,obj);
+        server.dirty++;
+    }
+}
+#endif
+
+//  l2sstore destination key
 void l2sstoreCommand(redisClient *c) {
     robj *src;
     
     /* find the source list */
     if ((src=lookupKeyReadOrReply(c,c->argv[2],shared.emptymultibulk)) == NULL
-		|| checkType(c,src,REDIS_LIST)) return;
+        || checkType(c,src,REDIS_LIST)) return;
 
     robj *dstset = createIntsetObject();
 
@@ -33,23 +50,22 @@ void l2sstoreCommand(redisClient *c) {
 
     while (listTypeNext(li,&entry)) {
         robj *obj=listTypeGet(&entry);
-	    setTypeAdd(dstset, obj);
-		decrRefCount(obj);
+        setTypeAdd(dstset, obj);
+        decrRefCount(obj);
     }
     listTypeReleaseIterator(li);
     
     dbDelete(c->db,c->argv[1]);
 
     if (setTypeSize(dstset) > 0) {
-		dbAdd(c->db,c->argv[1],dstset);
-		addReplyLongLong(c,setTypeSize(dstset));
+        dbAdd(c->db,c->argv[1],dstset);
+        addReplyLongLong(c,setTypeSize(dstset));
     } else {
-		decrRefCount(dstset);
-		addReply(c,shared.czero);
+        decrRefCount(dstset);
+        addReply(c,shared.czero);
     }
 
-    signalModifiedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 static
@@ -123,8 +139,7 @@ void luniqueGeneric(redisClient *c, robj *save, int forward) {
             decrRefCount(dstlist);
             addReply(c,shared.czero);
         }
-        signalModifiedKey(c->db,save);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,save);
     }
     else {
         if (listTypeLength(dstlist) > 0) {
@@ -197,8 +212,8 @@ void lforeachsstoreCommand(redisClient *c) {
             else if (sobj->type==REDIS_STRING) {
                 listTypePush(dstlist, sobj, REDIS_TAIL);
             }
-			decrRefCount(sobj);
-		}
+            decrRefCount(sobj);
+        }
         decrRefCount(obj);
     }
     listTypeReleaseIterator(li);
@@ -213,9 +228,7 @@ void lforeachsstoreCommand(redisClient *c) {
         decrRefCount(dstlist);
         addReply(c,shared.czero);
     }
-
-    signalModifiedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 //
@@ -274,8 +287,7 @@ void sforeachsstoreCommand(redisClient *c) {
         addReply(c,shared.czero);
     }
 
-    signalModifiedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 //
@@ -357,9 +369,8 @@ void zrangeByScoreAndMemberGeneric(redisClient *c, robj* save) {
 
             dbAdd(c->db,save,dstl);
             addReplyLongLong(c,listsize);
-        
-            signalModifiedKey(c->db,save);
-            server.dirty++;
+            
+            dirtyIfNotaTemp(c->db,save);
         }
         else {
             /* Return the result in form of a multi-bulk reply */
@@ -464,8 +475,7 @@ void groupsortstore(redisClient *c,
         addReply(c,shared.czero);
     }
 
-    signalModifiedKey(c->db,dst);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,dst);
 }
 
 /* GROUPSORT dst-list key-list key-pattern sort-pattern limit_min limit_count [ASC|DESC] [ALPHA] */
@@ -576,10 +586,8 @@ void groupsumCommand(redisClient *c) {
         decrRefCount(dst);
         addReply(c,shared.czero);
     }
-
-    signalModifiedKey(c->db,c->argv[1]);
-    server.dirty++;
-
+    
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 /*

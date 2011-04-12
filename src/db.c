@@ -189,8 +189,7 @@ void delCommand(redisClient *c) {
 
     for (j = 1; j < c->argc; j++) {
         if (dbDelete(c->db,c->argv[j])) {
-            touchWatchedKey(c->db,c->argv[j]);
-            server.dirty++;
+            dirtyIfNotaTemp(c->db,c->argv[j]);
             deleted++;
         }
     }
@@ -335,9 +334,18 @@ void renameGenericCommand(redisClient *c, int nx) {
         dbReplace(c->db,c->argv[2],o);
     }
     dbDelete(c->db,c->argv[1]);
-    touchWatchedKey(c->db,c->argv[1]);
-    touchWatchedKey(c->db,c->argv[2]);
-    server.dirty++;
+    int sdirty=0;
+    if (!isTempKey(c->argv[1])) {
+        touchWatchedKey(c->db,c->argv[1]);
+        ++sdirty;
+    }
+    if (!isTempKey(c->argv[2])) {
+        touchWatchedKey(c->db,c->argv[2]);
+        ++sdirty;
+    }
+    if (sdirty>0) 
+        server.dirty++;
+
     addReply(c,nx ? shared.cone : shared.ok);
 }
 
@@ -387,7 +395,9 @@ void moveCommand(redisClient *c) {
 
     /* OK! key moved, free the entry in the source DB */
     dbDelete(src,c->argv[1]);
-    server.dirty++;
+    if (!isTempKey(c->argv[1])) {
+        server.dirty++;
+    }
     addReply(c,shared.cone);
 }
 
@@ -501,8 +511,7 @@ void expireGenericCommand(redisClient *c, robj *key, robj *param, long offset) {
         time_t when = time(NULL)+seconds;
         setExpire(c->db,key,when);
         addReply(c,shared.cone);
-        touchWatchedKey(c->db,key);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,key);
         return;
     }
 }

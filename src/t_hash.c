@@ -279,8 +279,7 @@ void hsetCommand(redisClient *c) {
     hashTypeTryObjectEncoding(o,&c->argv[2], &c->argv[3]);
     update = hashTypeSet(o,c->argv[2],c->argv[3]);
     addReply(c, update ? shared.czero : shared.cone);
-    touchWatchedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 void hsetnxCommand(redisClient *c) {
@@ -294,8 +293,7 @@ void hsetnxCommand(redisClient *c) {
         hashTypeTryObjectEncoding(o,&c->argv[2], &c->argv[3]);
         hashTypeSet(o,c->argv[2],c->argv[3]);
         addReply(c, shared.cone);
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,c->argv[1]);
     }
 }
 
@@ -315,8 +313,7 @@ void hmsetCommand(redisClient *c) {
         hashTypeSet(o,c->argv[i],c->argv[i+1]);
     }
     addReply(c, shared.ok);
-    touchWatchedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 void hincrbyCommand(redisClient *c) {
@@ -342,8 +339,7 @@ void hincrbyCommand(redisClient *c) {
     hashTypeSet(o,c->argv[2],new);
     decrRefCount(new);
     addReplyLongLong(c,value);
-    touchWatchedKey(c->db,c->argv[1]);
-    server.dirty++;
+    dirtyIfNotaTemp(c->db,c->argv[1]);
 }
 
 void hgetCommand(redisClient *c) {
@@ -402,8 +398,7 @@ void hdelCommand(redisClient *c) {
     if (hashTypeDelete(o,c->argv[2])) {
         if (hashTypeLength(o) == 0) dbDelete(c->db,c->argv[1]);
         addReply(c,shared.cone);
-        touchWatchedKey(c->db,c->argv[1]);
-        server.dirty++;
+        dirtyIfNotaTemp(c->db,c->argv[1]);
     } else {
         addReply(c,shared.czero);
     }
